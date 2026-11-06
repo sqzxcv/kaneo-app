@@ -77,6 +77,8 @@ class SecureSessionStorage implements SessionStorage {
       return null;
     } on TypeError {
       return null;
+    } on ArgumentError {
+      return null; // Unknown credential type from an older or damaged saved session.
     }
   }
 
