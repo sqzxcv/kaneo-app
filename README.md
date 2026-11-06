@@ -1,3 +1,3 @@
-# kaneo_app
+# Kaneo App
 
-A new Flutter project.
+Flutter client for Kaneo. Working on it: see [AGENTS.md](AGENTS.md).
