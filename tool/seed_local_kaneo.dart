@@ -161,17 +161,22 @@ Future<String> _seedProject(_Api api, String workspaceId, String userId) async {
 
   final ids = <String>[];
   final tasks = [
-    ('Set up the project', 'high', 0),
-    ('Write the **first** description\n\n- [ ] a checklist item', 'medium', 0),
-    ('Review the board layout', 'low', 1),
-    ('Fix the drag preview', 'urgent', 1),
-    ('Ship the beta', 'high', 2),
-    ('Celebrate', 'no-priority', slugs.length - 1),
+    ('Set up the project', 'Set up the project', 'high', 0),
+    (
+      'Write the first description',
+      'Write the **first** description\n\n- [ ] a checklist item',
+      'medium',
+      0,
+    ),
+    ('Review the board layout', 'Review the board layout', 'low', 1),
+    ('Fix the drag preview', 'Fix the drag preview', 'urgent', 1),
+    ('Ship the beta', 'Ship the beta', 'high', 2),
+    ('Celebrate', 'Celebrate', 'no-priority', slugs.length - 1),
   ];
-  for (final (title, priority, column) in tasks) {
+  for (final (title, description, priority, column) in tasks) {
     final task = await api.ok('POST', 'api/task/$projectId', {
-      'title': title.split('\n').first,
-      'description': title,
+      'title': title,
+      'description': description,
       'priority': priority,
       'status': slugs[column],
       'userId': userId,
