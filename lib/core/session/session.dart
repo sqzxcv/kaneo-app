@@ -57,18 +57,19 @@ abstract class SessionStorage {
 
 /// Keeps the session in the Keychain, Keystore or the desktop's secret service.
 class SecureSessionStorage implements SessionStorage {
-  SecureSessionStorage()
+  SecureSessionStorage({this.key = 'kaneo.session'})
     : _storage = Platform.isMacOS
           // The data protection keychain needs a provisioning profile, which local builds lack.
           ? const FlutterSecureStorage(mOptions: MacOsOptions(usesDataProtectionKeychain: false))
           : const FlutterSecureStorage();
 
-  static const _key = 'kaneo.session';
+  /// An optional namespace lets integration tests avoid any existing app session.
+  final String key;
   final FlutterSecureStorage _storage;
 
   @override
   Future<Session?> read() async {
-    final raw = await _storage.read(key: _key);
+    final raw = await _storage.read(key: key);
     if (raw == null) return null;
     try {
       return Session.fromJson(jsonDecode(raw) as Map<String, dynamic>);
@@ -81,10 +82,10 @@ class SecureSessionStorage implements SessionStorage {
 
   @override
   Future<void> write(Session session) =>
-      _storage.write(key: _key, value: jsonEncode(session.toJson()));
+      _storage.write(key: key, value: jsonEncode(session.toJson()));
 
   @override
-  Future<void> clear() => _storage.delete(key: _key);
+  Future<void> clear() => _storage.delete(key: key);
 }
 
 /// Keeps the session until the app exits.

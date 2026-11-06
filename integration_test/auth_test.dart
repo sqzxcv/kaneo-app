@@ -29,10 +29,10 @@ void main() {
   testWidgets('production login and keychain persistence', (tester) async {
     expect(_server.isNotEmpty, isTrue, reason: 'Pass private AUTH_TEST_* defines.');
     expect(DevConfig.fromEnvironment().isConfigured, isFalse);
-    final storage = SecureSessionStorage();
+    final storage = SecureSessionStorage(key: 'kaneo.auth.integration.session');
     // The separate "save" and "restore" invocations prove that the session survives process exit.
-    if (_phase == 'restore') {
-      final container = await bootstrap();
+    if (_phase == 'restore' || (_phase == 'restart' && await storage.read() != null)) {
+      final container = await bootstrap(sessionStorage: storage);
       addTearDown(container.dispose);
       expect(
         container.read(sessionProvider) != null,
@@ -55,7 +55,7 @@ void main() {
       isTrue,
       reason: 'Use an empty test app installation; a session already exists.',
     );
-    final container = await bootstrap();
+    final container = await bootstrap(sessionStorage: storage);
     addTearDown(container.dispose);
     await container.read(languageChoiceProvider.notifier).select(defaultLocale);
     await tester.pumpWidget(
@@ -75,7 +75,7 @@ void main() {
           find.byKey(const ValueKey('login-error')).evaluate().isNotEmpty,
     );
     expect(container.read(sessionProvider) != null, isTrue, reason: 'Password sign-in failed');
-    final stored = await SecureSessionStorage().read();
+    final stored = await SecureSessionStorage(key: 'kaneo.auth.integration.session').read();
     expect(stored != null && stored.token == container.read(sessionProvider)?.token, isTrue);
     await container.read(sessionProvider.notifier).signOut();
     await tester.pumpAndSettle();
@@ -93,7 +93,13 @@ void main() {
           find.byKey(const ValueKey('login-error')).evaluate().isNotEmpty,
     );
     expect(container.read(sessionProvider) != null, isTrue, reason: 'API key sign-in failed');
-    expect((await SecureSessionStorage().read())?.credentialType == CredentialType.apiKey, isTrue);
-    if (_phase != 'save') await container.read(sessionProvider.notifier).signOut();
+    expect(
+      (await SecureSessionStorage(key: 'kaneo.auth.integration.session').read())?.credentialType ==
+          CredentialType.apiKey,
+      isTrue,
+    );
+    if (_phase != 'save' && _phase != 'restart') {
+      await container.read(sessionProvider.notifier).signOut();
+    }
   });
 }
