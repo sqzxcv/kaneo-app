@@ -1,0 +1,3 @@
+[submodule "kaneo"]
+	path = kaneo
+	url = https://github.com/sqzxcv/kaneo.git
