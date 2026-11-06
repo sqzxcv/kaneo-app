@@ -8,7 +8,14 @@
 		},
 		"auth": {
 			"signInPending": "登入表單由 KAN-23 實作。",
-			"devSignIn": "開發登入"
+			"devSignIn": "開發登入",
+			"selfHosted": "登入你自己的 Kaneo 伺服器。",
+			"passwordLogin": "帳號密碼",
+			"invalidAddress": "請輸入有效的 HTTP 或 HTTPS 伺服器位址。",
+			"required": "請填寫此欄位。",
+			"noSession": "伺服器未傳回工作階段，請重試。",
+			"storageFailed": "無法安全儲存登入資訊，請檢查系統鑰匙圈是否可用後重試。",
+			"signingIn": "正在登入…"
 		},
 		"task": {
 			"title": "任務"

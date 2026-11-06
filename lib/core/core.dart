@@ -21,6 +21,8 @@ export 'layout/breakpoints.dart';
 export 'providers.dart';
 export 'router/app_router.dart';
 export 'session/session.dart';
+export 'session/authentication.dart';
+export '../platform/authenticated_socket.dart';
 export 'theme/app_theme.dart';
 export 'ui/action.dart';
 export 'ui/async_body.dart';

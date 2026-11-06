@@ -8,7 +8,14 @@
 		},
 		"auth": {
 			"signInPending": "登录表单由 KAN-23 实现。",
-			"devSignIn": "开发登录"
+			"devSignIn": "开发登录",
+			"selfHosted": "登录你自己的 Kaneo 服务器。",
+			"passwordLogin": "账号密码",
+			"invalidAddress": "请输入有效的 HTTP 或 HTTPS 服务器地址。",
+			"required": "请填写此项。",
+			"noSession": "服务器未返回会话，请重试。",
+			"storageFailed": "无法安全保存登录信息，请检查系统钥匙串是否可用后重试。",
+			"signingIn": "正在登录…"
 		},
 		"task": {
 			"title": "任务"

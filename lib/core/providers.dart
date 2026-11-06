@@ -47,6 +47,13 @@ class SessionController extends Notifier<Session?> {
     state = session;
   }
 
+  /// Production sign-in must reach secure storage before the account becomes active.
+  /// A storage failure is shown instead of promising a session that disappears on relaunch.
+  Future<void> signInPersistently(Session session) async {
+    await ref.read(sessionStorageProvider).write(session);
+    state = session;
+  }
+
   /// Signs out and forgets everything cached for this account.
   Future<void> signOut() async {
     await _clear();

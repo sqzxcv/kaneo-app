@@ -8,7 +8,14 @@
 		},
 		"auth": {
 			"signInPending": "The sign-in form comes with KAN-23.",
-			"devSignIn": "Developer sign-in"
+			"devSignIn": "Developer sign-in",
+			"selfHosted": "Sign in to your own Kaneo server.",
+			"passwordLogin": "Email and password",
+			"invalidAddress": "Enter a valid HTTP or HTTPS server address.",
+			"required": "Enter a value.",
+			"noSession": "The server did not return a session. Please try again.",
+			"storageFailed": "Could not save your login securely. Check that your system keychain is available and try again.",
+			"signingIn": "Signing in…"
 		},
 		"task": {
 			"title": "Task"
