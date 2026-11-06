@@ -6,11 +6,18 @@ import 'package:kaneo_app/core/core.dart';
 import '../task/open_task.dart';
 
 class BoardCard extends StatelessWidget {
-  const BoardCard({super.key, required this.task, required this.projectSlug, this.isFinal = false});
+  const BoardCard({
+    super.key,
+    required this.task,
+    required this.projectSlug,
+    this.isFinal = false,
+    this.dragHandle,
+  });
 
   final BoardTask task;
   final String projectSlug;
   final bool isFinal;
+  final Widget? dragHandle;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +47,7 @@ class BoardCard extends StatelessWidget {
             children: [
               Row(
                 children: [
+                  ?dragHandle,
                   Expanded(
                     child: Text(
                       ticketId(projectSlug, task.number),

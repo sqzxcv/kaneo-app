@@ -6,7 +6,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:kaneo_app/core/core.dart';
 
 import '../task/open_task.dart';
-import 'board_card.dart';
+import 'board_lanes.dart';
+import 'board_move.dart';
 import 'board_orientation.dart';
 
 class BoardPage extends ConsumerStatefulWidget {
@@ -18,16 +19,34 @@ class BoardPage extends ConsumerStatefulWidget {
 }
 
 class _BoardPageState extends ConsumerState<BoardPage> {
-  final _horizontal = ScrollController();
+  bool _moving = false;
   final _refreshKey = GlobalKey<RefreshIndicatorState>();
 
-  @override
-  void dispose() {
-    _horizontal.dispose();
-    super.dispose();
+  Future<void> _move(String id, String status, int index) async {
+    if (_moving) return;
+    final query = boardQuery(widget.projectId);
+    final board = ref.read(query).value;
+    if (board == null) return;
+    final move = planBoardMove(board, id, status, index);
+    if (move == null) return;
+    final subscription = ProviderScope.containerOf(context, listen: false).listen(query, (_, _) {});
+    final notifier = ref.read(query.notifier);
+    final api = ref.read(kaneoApiProvider);
+    setState(() => _moving = true);
+    notifier.setData(move.after);
+    final ok = await runAction(context, () async {
+      await api.reorderTasks(widget.projectId, move.updates);
+      return true;
+    });
+    if (ok != true) {
+      notifier.setData(move.rollback(subscription.read().value ?? move.after));
+    }
+    subscription.close();
+    if (mounted) setState(() => _moving = false);
   }
 
   Future<void> _refresh() async {
+    if (_moving) return;
     final query = boardQuery(widget.projectId);
     await ref.read(query.notifier).refresh();
     if (mounted && ref.read(query).hasError) {
@@ -72,7 +91,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
             IconButton(
               tooltip: context.t('mobile:board.refresh'),
               icon: const Icon(LucideIcons.refreshCw, size: 18),
-              onPressed: value.isLoading
+              onPressed: value.isLoading || _moving
                   ? null
                   : () {
                       if (_refreshKey.currentState != null) {
@@ -100,132 +119,10 @@ class _BoardPageState extends ConsumerState<BoardPage> {
               key: _refreshKey,
               onRefresh: _refresh,
               notificationPredicate: (notification) => notification.metrics.axis == Axis.vertical,
-              child: Scrollbar(
-                controller: _horizontal,
-                thumbVisibility: true,
-                notificationPredicate: (notification) =>
-                    notification.metrics.axis == Axis.horizontal,
-                child: SingleChildScrollView(
-                  key: const ValueKey('board-horizontal'),
-                  controller: _horizontal,
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (final column in board.columns)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 12),
-                          child: SizedBox(
-                            width: context.isWide ? 300 : 280,
-                            child: _BoardColumn(
-                              key: ValueKey(column.id),
-                              column: column,
-                              board: board,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+              child: BoardLanes(board: board, busy: _moving, onMove: _move),
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-IconData boardColumnIcon(BoardColumn column) =>
-    switch (column.icon?.toLowerCase().replaceAll('-', '')) {
-      'circlecheck' || 'checkcircle' || 'checkcircle2' => LucideIcons.circleCheck,
-      'circle' => LucideIcons.circle,
-      'circledot' => LucideIcons.circleDot,
-      'circledashed' => LucideIcons.circleDashed,
-      'search' => LucideIcons.search,
-      'circlepause' || 'pausecircle' => LucideIcons.circlePause,
-      'clock' => LucideIcons.clock,
-      'archive' => LucideIcons.archive,
-      'inbox' => LucideIcons.inbox,
-      'circleplay' || 'playcircle' => LucideIcons.circlePlay,
-      'circlex' || 'xcircle' => LucideIcons.circleX,
-      _ =>
-        column.isFinal == true
-            ? LucideIcons.circleCheck
-            : switch (column.slug) {
-                'in-progress' => LucideIcons.circleDot,
-                'in-review' => LucideIcons.search,
-                'planned' => LucideIcons.clock,
-                _ => LucideIcons.circle,
-              },
-    };
-
-class _BoardColumn extends StatelessWidget {
-  const _BoardColumn({super.key, required this.column, required this.board});
-  final BoardColumn column;
-  final BoardData board;
-
-  @override
-  Widget build(BuildContext context) {
-    final tasks = column.tasks ?? const <BoardTask>[];
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: context.colors.boardLane,
-        borderRadius: BorderRadius.circular(KaneoRadius.lg),
-      ),
-      child: Column(
-        children: [
-          Padding(
-            key: ValueKey('column-header-${column.id}'),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Icon(boardColumnIcon(column), size: 16, color: context.colors.chipIcon),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    column.name,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  context.t('app:board.taskCount', {'count': tasks.length}),
-                  style: TextStyle(fontSize: 11, color: context.colors.boardId),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              key: PageStorageKey('column-tasks-${column.id}'),
-              primary: false,
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              itemCount: tasks.isEmpty ? 1 : tasks.length,
-              itemBuilder: (context, index) => tasks.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        context.t('mobile:board.noTasksHere'),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: context.colors.mutedForeground),
-                      ),
-                    )
-                  : Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: BoardCard(
-                        key: ValueKey('board-card-${tasks[index].id}'),
-                        task: tasks[index],
-                        projectSlug: board.slug,
-                        isFinal: column.isFinal == true,
-                      ),
-                    ),
-            ),
-          ),
-        ],
       ),
     );
   }
