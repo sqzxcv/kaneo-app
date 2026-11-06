@@ -25,7 +25,8 @@ API_LOG="$DATA_DIR/api.log"
 PG_LOG="$DATA_DIR/postgres.log"
 
 PG_PORT="${KANEO_PG_PORT:-55432}"
-API_PORT="${KANEO_API_PORT:-1337}"
+# The API always listens here; it has no setting for it.
+API_PORT=1337
 KANEO_REMOTE="https://github.com/sqzxcv/kaneo.git"
 
 PG_BIN="$(brew --prefix postgresql@17 2>/dev/null)/bin"
