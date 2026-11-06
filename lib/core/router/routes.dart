@@ -17,8 +17,8 @@ abstract final class AppRoutes {
   static String task(String taskId) => '/task/$taskId';
 
   /// [status] preselects a column when creating from that column.
-  static String newTask({String? projectId, String? status}) => Uri(
-    path: newTaskPath,
-    queryParameters: {'projectId': ?projectId, 'status': ?status},
-  ).toString();
+  static String newTask({String? projectId, String? status}) {
+    final query = {'projectId': ?projectId, 'status': ?status};
+    return Uri(path: newTaskPath, queryParameters: query.isEmpty ? null : query).toString();
+  }
 }

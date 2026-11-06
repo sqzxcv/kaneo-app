@@ -3,11 +3,12 @@
 # full build happens at a time. Other callers wait in line until the command finishes.
 #
 #   tool/with_device.sh flutter build macos
-#   tool/with_device.sh flutter test integration_test -d "iPhone 17"
+#   tool/with_device.sh --boot "iPhone 17" flutter test integration_test -d "iPhone 17"
 #
-# Simulators booted while the command runs are shut down afterwards. Simulators that were already
-# running belong to someone else and are left alone. The lock is held by the kernel, so it is
-# released even if the holder crashes.
+# --boot starts a simulator, without opening Simulator.app, once the queue is ours. It can be
+# repeated. Only simulators started this way are shut down afterwards: any other simulator belongs
+# to someone else and is left alone, even one that came up while the command ran. The lock is held
+# by the kernel, so it is released even if the holder crashes.
 #
 #   KANEO_DEVICE_LOCK  Lock file, defaults to ~/.cache/kaneo-app/device.lock
 set -euo pipefail
@@ -20,19 +21,23 @@ fi
 lock_file="${KANEO_DEVICE_LOCK:-$HOME/.cache/kaneo-app/device.lock}"
 mkdir -p "$(dirname "$lock_file")"
 
-booted_simulators() {
-  command -v xcrun >/dev/null || return 0
-  xcrun simctl list devices booted 2>/dev/null |
-    sed -nE 's/.*\(([0-9A-F-]{36})\) \(Booted\).*/\1/p' | sort
+# Accepts a simulator's exact name or its UDID.
+simulator_udid() {
+  if [[ "$1" =~ ^[0-9A-F-]{36}$ ]]; then
+    echo "$1"
+    return 0
+  fi
+  xcrun simctl list devices available | grep -F -- "    $1 (" |
+    sed -nE 's/.*\(([0-9A-F-]{36})\).*/\1/p' | tail -n 1
 }
 
 # Runs inside the lock.
 if [[ "${KANEO_DEVICE_LOCK_HELD:-}" == "$lock_file" ]]; then
   echo "pid $PPID: $*" >"$lock_file.holder"
-  before="$(booted_simulators)"
+  started=()
   cleanup() {
     local udid
-    for udid in $(comm -13 <(echo "$before") <(booted_simulators)); do
+    for udid in ${started[@]+"${started[@]}"}; do
       echo "with_device: shutting down simulator $udid" >&2
       xcrun simctl shutdown "$udid" || true
     done
@@ -41,6 +46,22 @@ if [[ "${KANEO_DEVICE_LOCK_HELD:-}" == "$lock_file" ]]; then
   trap cleanup EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
+
+  while [[ "${1:-}" == "--boot" ]]; do
+    udid="$(simulator_udid "$2")"
+    if [[ -z "$udid" ]]; then
+      echo "with_device: no simulator named $2" >&2
+      exit 1
+    fi
+    if xcrun simctl list devices booted | grep -qF "$udid"; then
+      echo "with_device: simulator $udid was already running, leaving it running afterwards" >&2
+    else
+      started+=("$udid")
+      xcrun simctl bootstatus "$udid" -b >/dev/null
+    fi
+    shift 2
+  done
+
   "$@"
   exit $?
 fi
@@ -49,8 +70,9 @@ export KANEO_DEVICE_LOCK_HELD="$lock_file"
 
 run_locked() {
   # `lockf` on macOS, `flock` on Linux. Both wait, and both use a lock the kernel releases on exit.
+  # -k keeps the file: removing it would let a later caller lock a new file next to a waiting one.
   if command -v lockf >/dev/null; then
-    lockf "$@"
+    lockf -k "$@"
   elif command -v flock >/dev/null; then
     local file="$1"
     shift

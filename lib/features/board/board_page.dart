@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/core.dart';
@@ -21,7 +20,7 @@ class BoardPage extends ConsumerWidget {
         IconButton(
           tooltip: context.t('mobile:board.newTask'),
           icon: const Icon(LucideIcons.plus),
-          onPressed: () => context.push(AppRoutes.newTask(projectId: projectId)),
+          onPressed: () => openNewTask(context, projectId: projectId),
         ),
       ],
       child: AsyncBody(

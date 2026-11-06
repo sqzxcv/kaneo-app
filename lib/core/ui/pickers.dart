@@ -190,6 +190,8 @@ Future<Picked<DateTime?>?> pickDate(
   final now = DateTime.now();
   final day = await showDatePicker(
     context: context,
+    // A tap outside would read as "clear", because the dialog only reports null.
+    barrierDismissible: false,
     helpText: title,
     initialDate: current ?? now,
     firstDate: DateTime(now.year - 20),

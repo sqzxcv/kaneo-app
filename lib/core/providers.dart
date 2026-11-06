@@ -100,7 +100,8 @@ class SessionController extends Notifier<Session?> {
   }
 
   Future<void> _clear() async {
-    await ref.read(cacheStoreProvider).clear();
+    final session = state;
+    if (session != null) await ref.read(cacheStoresProvider).forAccount(session).clear();
     try {
       await ref.read(sessionStorageProvider).clear();
     } on Exception {
@@ -124,16 +125,35 @@ final kaneoApiProvider = Provider<KaneoApi>((ref) {
   return KaneoApi(ref.watch(apiClientProvider), ref.watch(i18nProvider));
 });
 
-/// The cache of the signed-in account. Accounts never share one.
-final cacheStoreProvider = Provider<CacheStore>((ref) {
-  final session = ref.watch(sessionProvider.select((s) => s == null ? null : _cacheScope(s)));
-  final root = ref.watch(cacheRootProvider);
-  if (session == null || root == null) return MemoryCacheStore();
-  return FileCacheStore(Directory('${root.path}/$session'));
-});
+/// One cache per account, so accounts never share one.
+class CacheStores {
+  CacheStores(this._root);
 
-String _cacheScope(Session session) =>
-    Uri.encodeComponent('${session.serverUrl}|${session.userId}');
+  final Directory? _root;
+  final Map<String, CacheStore> _stores = {};
+
+  CacheStore forAccount(Session session) {
+    final scope = Uri.encodeComponent('${session.serverUrl}|${session.userId}');
+    final root = _root;
+    return _stores.putIfAbsent(
+      scope,
+      () => root == null ? MemoryCacheStore() : FileCacheStore(Directory('${root.path}/$scope')),
+    );
+  }
+}
+
+/// Separate from [cacheStoreProvider] so that [SessionController] can clear a cache: a provider
+/// cannot read another one that depends on it.
+final cacheStoresProvider = Provider<CacheStores>(
+  (ref) => CacheStores(ref.watch(cacheRootProvider)),
+);
+
+/// The cache of the signed-in account.
+final cacheStoreProvider = Provider<CacheStore>((ref) {
+  final session = ref.watch(sessionProvider);
+  if (session == null) return MemoryCacheStore();
+  return ref.watch(cacheStoresProvider).forAccount(session);
+});
 
 /// The app's cache directory, or null when the platform has none.
 Future<Directory?> defaultCacheRoot() async {

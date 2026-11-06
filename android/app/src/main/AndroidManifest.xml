@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Debug builds get this from their own manifest. Release builds need it to reach the server. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="kaneo_app"
         android:name="${applicationName}"
