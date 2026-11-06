@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kaneo_app/core/core.dart';
 import 'package:kaneo_app/features/board/board_move.dart';
+import 'package:kaneo_app/features/board/board_data.dart';
 import 'package:kaneo_app/features/board/board_lanes.dart';
 
 BoardTask task(String id, String status, num position) =>
@@ -27,6 +28,16 @@ List<String> ids(BoardData data, int column) =>
     data.columns[column].tasks!.map((t) => t.id).toList();
 
 void main() {
+  test('editing one card preserves other cards, column order and metadata', () {
+    final before = fixture();
+    final after = updateBoardTask(before, 'b', (task) => task.copyWith(priority: 'urgent'));
+    expect(ids(after, 0), ['a', 'b', 'c']);
+    expect(after.columns.first.tasks![1].priority, 'urgent');
+    expect(before.columns.first.tasks![1].priority, isNull);
+    expect(after.columns[1].tasks!.single, same(before.columns[1].tasks!.single));
+    expect(boardProjectColumns(after).first.slug, 'pool');
+    expect(boardProjectColumns(after).first.name, '需求池');
+  });
   test('moving to a custom or empty column updates status and integer position', () {
     final before = fixture();
     final move = planBoardMove(before, 'a', 'plan', 1)!;

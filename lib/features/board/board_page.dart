@@ -7,6 +7,7 @@ import 'package:kaneo_app/core/core.dart';
 
 import '../task/open_task.dart';
 import 'board_lanes.dart';
+import 'board_data.dart';
 import 'board_move.dart';
 import 'board_orientation.dart';
 
@@ -20,6 +21,7 @@ class BoardPage extends ConsumerStatefulWidget {
 
 class _BoardPageState extends ConsumerState<BoardPage> {
   bool _moving = false;
+  bool _menuOpen = false;
   final _refreshKey = GlobalKey<RefreshIndicatorState>();
 
   Future<void> _move(String id, String status, int index) async {
@@ -43,6 +45,151 @@ class _BoardPageState extends ConsumerState<BoardPage> {
     }
     subscription.close();
     if (mounted) setState(() => _moving = false);
+  }
+
+  Future<void> _editCard(
+    String id,
+    BoardTask Function(BoardTask task) update,
+    BoardTask Function(BoardTask current, BoardTask before) undo,
+    Future<Task> Function(KaneoApi api) save,
+  ) async {
+    if (_moving) return;
+    final query = boardQuery(widget.projectId);
+    final board = ref.read(query).value;
+    final before = board == null ? null : boardTasks(board).where((t) => t.id == id).firstOrNull;
+    if (board == null || before == null) return;
+    final subscription = ProviderScope.containerOf(context, listen: false).listen(query, (_, _) {});
+    final notifier = ref.read(query.notifier);
+    final api = ref.read(kaneoApiProvider);
+    setState(() => _moving = true);
+    notifier.setData(updateBoardTask(board, id, update));
+    final saved = await runAction(context, () => save(api));
+    if (saved == null) {
+      notifier.setData(
+        updateBoardTask(subscription.read().value ?? board, id, (t) => undo(t, before)),
+      );
+    }
+    subscription.close();
+    if (mounted) setState(() => _moving = false);
+  }
+
+  Future<void> _menu(BuildContext anchor, BoardTask task, Offset position) async {
+    if (_menuOpen) return;
+    _menuOpen = true;
+    try {
+      final action = await showActionMenu(
+        anchor,
+        position: position,
+        items: [
+          MenuAction(
+            value: 'status',
+            label: context.t('mobile:board.moveTo'),
+            icon: LucideIcons.arrowRight,
+            enabled: !_moving,
+          ),
+          MenuAction(
+            value: 'assignee',
+            label: context.t('mobile:board.assignee'),
+            icon: LucideIcons.user,
+            enabled: !_moving,
+          ),
+          MenuAction(
+            value: 'priority',
+            label: context.t('mobile:board.priority'),
+            icon: LucideIcons.signal,
+            enabled: !_moving,
+          ),
+          MenuAction(
+            value: 'top',
+            label: context.t('mobile:board.sendToTopOfColumn'),
+            icon: LucideIcons.arrowUpToLine,
+            enabled: !_moving,
+          ),
+          MenuAction(
+            value: 'bottom',
+            label: context.t('mobile:board.sendToBottomOfColumn'),
+            icon: LucideIcons.arrowDownToLine,
+            enabled: !_moving,
+          ),
+          MenuAction(
+            value: 'open',
+            label: context.t('mobile:board.openTask'),
+            icon: LucideIcons.squareArrowOutUpRight,
+          ),
+        ],
+      );
+      if (!mounted || !anchor.mounted || action == null) return;
+      final board = ref.read(boardQuery(widget.projectId)).value;
+      if (board == null) return;
+      final current = boardTasks(board).where((t) => t.id == task.id).firstOrNull;
+      if (current == null) return;
+      switch (action) {
+        case 'open':
+          openTask(anchor, current.id, projectId: current.projectId);
+        case 'top':
+          await _move(current.id, current.status, 0);
+        case 'bottom':
+          final column = board.columns.firstWhere((c) => c.slug == current.status);
+          await _move(current.id, current.status, column.tasks?.length ?? 0);
+        case 'status':
+          final status = await pickStatus(
+            anchor,
+            columns: boardProjectColumns(board),
+            current: current.status,
+            position: position,
+          );
+          if (!mounted || status == null || status == current.status) return;
+          final column = board.columns.firstWhere((c) => c.slug == status);
+          await _move(current.id, status, column.tasks?.length ?? 0);
+        case 'priority':
+          final priority = await pickPriority(
+            anchor,
+            current: current.priority,
+            position: position,
+          );
+          if (!mounted || priority == null || priority == current.priority) return;
+          await _editCard(
+            current.id,
+            (t) => t.copyWith(priority: priority),
+            (t, before) => t.copyWith(priority: before.priority),
+            (api) => api.updatePriority(current.id, priority),
+          );
+        case 'assignee':
+          final members = await runAction(
+            context,
+            () => ref.read(
+              membersQuery((workspaceId: board.workspaceId, projectId: board.id)).future,
+            ),
+          );
+          if (!mounted || !anchor.mounted || members == null) return;
+          final picked = await pickAssignee(
+            anchor,
+            members: members,
+            current: current.assigneeId,
+            position: position,
+          );
+          if (!mounted || picked == null || picked.value == current.assigneeId) return;
+          final member = members.where((m) => m.id == picked.value).firstOrNull;
+          await _editCard(
+            current.id,
+            (t) => t.copyWith(
+              userId: picked.value,
+              assigneeId: picked.value,
+              assigneeName: member?.name,
+              assigneeImage: member?.image,
+            ),
+            (t, before) => t.copyWith(
+              userId: before.userId,
+              assigneeId: before.assigneeId,
+              assigneeName: before.assigneeName,
+              assigneeImage: before.assigneeImage,
+            ),
+            (api) => api.updateAssignee(current.id, picked.value),
+          );
+      }
+    } finally {
+      _menuOpen = false;
+    }
   }
 
   Future<void> _refresh() async {
@@ -119,7 +266,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
               key: _refreshKey,
               onRefresh: _refresh,
               notificationPredicate: (notification) => notification.metrics.axis == Axis.vertical,
-              child: BoardLanes(board: board, busy: _moving, onMove: _move),
+              child: BoardLanes(board: board, busy: _moving, onMove: _move, onMenu: _menu),
             ),
           ),
         ),

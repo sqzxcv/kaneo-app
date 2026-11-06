@@ -12,12 +12,14 @@ class BoardCard extends StatelessWidget {
     required this.projectSlug,
     this.isFinal = false,
     this.dragHandle,
+    this.onMenu,
   });
 
   final BoardTask task;
   final String projectSlug;
   final bool isFinal;
   final Widget? dragHandle;
+  final void Function(BuildContext context, BoardTask task, Offset position)? onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -31,98 +33,106 @@ class BoardCard extends StatelessWidget {
       'low' => colors.priorityLow,
       _ => colors.chipMuted,
     };
-    return Material(
-      color: isFinal ? colors.boardCardDone : colors.boardCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(KaneoRadius.lg),
-        side: BorderSide(color: isFinal ? colors.boardCardDoneBorder : colors.boardCardBorder),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => openTask(context, task.id, projectId: task.projectId),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  ?dragHandle,
-                  Expanded(
-                    child: Text(
-                      ticketId(projectSlug, task.number),
-                      style: TextStyle(
-                        fontFamily: KaneoFonts.mono,
-                        fontSize: 11,
-                        color: colors.boardId,
-                      ),
-                    ),
-                  ),
-                  if (task.assigneeId != null || task.assigneeName != null)
-                    Tooltip(
-                      message: task.assigneeName ?? context.t('mobile:board.assignee'),
-                      child: CircleAvatar(
-                        radius: 12,
-                        backgroundColor: colors.avatar,
-                        foregroundColor: colors.avatarForeground,
-                        child: Text(
-                          initials(task.assigneeName),
-                          style: const TextStyle(fontSize: 10),
+    return GestureDetector(
+      onSecondaryTapDown: onMenu == null
+          ? null
+          : (details) => onMenu!(context, task, details.globalPosition),
+      onLongPressStart: onMenu == null
+          ? null
+          : (details) => onMenu!(context, task, details.globalPosition),
+      child: Material(
+        color: isFinal ? colors.boardCardDone : colors.boardCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(KaneoRadius.lg),
+          side: BorderSide(color: isFinal ? colors.boardCardDoneBorder : colors.boardCardBorder),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => openTask(context, task.id, projectId: task.projectId),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    ?dragHandle,
+                    Expanded(
+                      child: Text(
+                        ticketId(projectSlug, task.number),
+                        style: TextStyle(
+                          fontFamily: KaneoFonts.mono,
+                          fontSize: 11,
+                          color: colors.boardId,
                         ),
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                task.title,
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: isFinal ? colors.boardTitleDone : colors.boardTitle,
-                ),
-              ),
-              if ((task.priority != null && task.priority != 'no-priority') ||
-                  due.isNotEmpty ||
-                  (task.labels?.isNotEmpty ?? false) ||
-                  (count?.total ?? 0) > 0) ...[
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    if (task.priority != null && task.priority != 'no-priority')
-                      _Chip(
-                        icon: LucideIcons.signal,
-                        text: priorityLabel(context, task.priority),
-                        color: priorityColor,
-                      ),
-                    if (due.isNotEmpty)
-                      _Chip(
-                        icon: LucideIcons.calendar,
-                        text: due,
-                        color: !isFinal && isOverdue(task.dueDate)
-                            ? colors.dueOverdue
-                            : colors.chipMuted,
-                      ),
-                    for (final label in task.labels ?? const <TaskLabel>[])
-                      _Chip(
-                        icon: LucideIcons.tag,
-                        text: label.name,
-                        color: labelColor(label.color),
-                      ),
-                    if ((count?.total ?? 0) > 0)
-                      _Chip(
-                        icon: LucideIcons.listChecks,
-                        text: '${count?.completed ?? 0}/${count!.total}',
-                        color: colors.chipMuted,
+                    if (task.assigneeId != null || task.assigneeName != null)
+                      Tooltip(
+                        message: task.assigneeName ?? context.t('mobile:board.assignee'),
+                        child: CircleAvatar(
+                          radius: 12,
+                          backgroundColor: colors.avatar,
+                          foregroundColor: colors.avatarForeground,
+                          child: Text(
+                            initials(task.assigneeName),
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                        ),
                       ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  task.title,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: isFinal ? colors.boardTitleDone : colors.boardTitle,
+                  ),
+                ),
+                if ((task.priority != null && task.priority != 'no-priority') ||
+                    due.isNotEmpty ||
+                    (task.labels?.isNotEmpty ?? false) ||
+                    (count?.total ?? 0) > 0) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      if (task.priority != null && task.priority != 'no-priority')
+                        _Chip(
+                          icon: LucideIcons.signal,
+                          text: priorityLabel(context, task.priority),
+                          color: priorityColor,
+                        ),
+                      if (due.isNotEmpty)
+                        _Chip(
+                          icon: LucideIcons.calendar,
+                          text: due,
+                          color: !isFinal && isOverdue(task.dueDate)
+                              ? colors.dueOverdue
+                              : colors.chipMuted,
+                        ),
+                      for (final label in task.labels ?? const <TaskLabel>[])
+                        _Chip(
+                          icon: LucideIcons.tag,
+                          text: label.name,
+                          color: labelColor(label.color),
+                        ),
+                      if ((count?.total ?? 0) > 0)
+                        _Chip(
+                          icon: LucideIcons.listChecks,
+                          text: '${count?.completed ?? 0}/${count!.total}',
+                          color: colors.chipMuted,
+                        ),
+                    ],
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

@@ -17,9 +17,16 @@ double boardEdgeScroll(double pointer, double extent) {
 }
 
 class BoardLanes extends StatefulWidget {
-  const BoardLanes({super.key, required this.board, required this.onMove, this.busy = false});
+  const BoardLanes({
+    super.key,
+    required this.board,
+    required this.onMove,
+    this.busy = false,
+    this.onMenu,
+  });
   final BoardData board;
   final bool busy;
+  final void Function(BuildContext context, BoardTask task, Offset position)? onMenu;
   final void Function(String id, String status, int index) onMove;
 
   @override
@@ -120,6 +127,7 @@ class _BoardLanesState extends State<BoardLanes> {
         projectSlug: widget.board.slug,
         isFinal: column.isFinal == true,
         dragHandle: handle,
+        onMenu: widget.onMenu,
       ),
     );
     // Touch scrolling and the long-press menu remain available on the card body.
