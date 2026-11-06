@@ -69,7 +69,7 @@ void main() {
       expect(find.text('1 task'), findsNWidgets(2));
       expect(find.text('2 tasks'), findsNWidgets(2));
 
-      await tester.scrollUntilVisible(find.text('Set up the project'), 100);
+      await tester.ensureVisible(find.text('Set up the project'));
       await tester.tap(find.text('Set up the project'));
       await tester.pumpAndSettle();
       expect(find.text('Task'), findsOneWidget);
