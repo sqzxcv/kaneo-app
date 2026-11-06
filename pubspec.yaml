@@ -1,5 +1,5 @@
 name: kaneo_app
-description: "A new Flutter project."
+description: "Flutter client for Kaneo."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -28,7 +28,7 @@ dependencies:
   shared_preferences: ^2.5.6
   url_launcher: ^6.3.3
   web_socket_channel: ^3.0.3
-  window_manager: ^0.6.0
+  window_manager: ^0.5.1
   workmanager: ^0.10.10
 
 dev_dependencies:
@@ -40,3 +40,27 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/i18n/
+    - assets/i18n/overrides/
+
+  fonts:
+    - family: Geist
+      fonts:
+        - asset: assets/fonts/Geist_400Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Geist_500Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Geist_600SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Geist_700Bold.ttf
+          weight: 700
+    - family: GeistMono
+      fonts:
+        - asset: assets/fonts/GeistMono_400Regular.ttf
+          weight: 400
+        - asset: assets/fonts/GeistMono_500Medium.ttf
+          weight: 500
+        - asset: assets/fonts/GeistMono_600SemiBold.ttf
+          weight: 600

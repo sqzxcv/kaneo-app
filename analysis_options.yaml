@@ -8,3 +8,7 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    - kaneo/**
+
+formatter:
+  page_width: 100

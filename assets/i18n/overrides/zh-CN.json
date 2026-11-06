@@ -1,0 +1,60 @@
+{
+	"app": {
+		"errors": {
+			"badResponse": "服务器返回的内容无法识别。"
+		},
+		"placeholder": {
+			"notice": "这是占位页，正式页面由后续任务实现。"
+		},
+		"auth": {
+			"signInPending": "登录表单由 KAN-23 实现。",
+			"devSignIn": "开发登录"
+		},
+		"task": {
+			"title": "任务"
+		},
+		"board": {
+			"columnCount_other": "{{count}} 列",
+			"taskCount_other": "{{count}} 个任务"
+		},
+		"list": {
+			"count_other": "{{count}} 项"
+		},
+		"language": {
+			"system": "跟随系统"
+		}
+	},
+	"mobile": {
+		"account": {
+			"deleteAccount": {
+				"sectionTitle": "危险区域",
+				"title": "删除账户",
+				"description": "永久删除你的账户及其数据。",
+				"modalTitle": "删除你的账户？",
+				"modalDescription": "此操作会永久删除你的账户，且无法撤销。只有你一人的工作区会一并删除。在其他工作区，你的任务会保留并变为未分配，你的评论会被移除。",
+				"confirmLabel": "输入 {{email}} 以确认",
+				"password": "密码",
+				"passwordHint": "如果登录时不使用密码，请留空。",
+				"confirm": "删除账户",
+				"success": "你的账户已删除",
+				"sessionTooOld": "为了安全，请输入密码，或者退出后重新登录，再删除账户。",
+				"wrongPassword": "密码不正确。",
+				"noPassword": "此账户没有密码，请留空。"
+			}
+		},
+		"editor": {
+			"checklist": "待办清单",
+			"numberedList": "有序列表",
+			"quote": "引用",
+			"linkUrl": "链接地址",
+			"applyLink": "应用",
+			"removeLink": "移除链接",
+			"hideKeyboard": "收起键盘"
+		},
+		"notificationSettings": {
+			"delivery": {
+				"webhook": "Webhook"
+			}
+		}
+	}
+}

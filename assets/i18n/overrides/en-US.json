@@ -1,0 +1,30 @@
+{
+	"app": {
+		"errors": {
+			"badResponse": "The server sent a response this app can't read."
+		},
+		"placeholder": {
+			"notice": "Placeholder page. The real page comes with a later task."
+		},
+		"auth": {
+			"signInPending": "The sign-in form comes with KAN-23.",
+			"devSignIn": "Developer sign-in"
+		},
+		"task": {
+			"title": "Task"
+		},
+		"board": {
+			"columnCount_one": "{{count}} column",
+			"columnCount_other": "{{count}} columns",
+			"taskCount_one": "{{count}} task",
+			"taskCount_other": "{{count}} tasks"
+		},
+		"list": {
+			"count_one": "{{count}} item",
+			"count_other": "{{count}} items"
+		},
+		"language": {
+			"system": "Match system"
+		}
+	}
+}

@@ -1,0 +1,55 @@
+{
+	"app": {
+		"errors": {
+			"badResponse": "伺服器回傳的內容無法識別。"
+		},
+		"placeholder": {
+			"notice": "這是佔位頁，正式頁面由後續任務實作。"
+		},
+		"auth": {
+			"signInPending": "登入表單由 KAN-23 實作。",
+			"devSignIn": "開發登入"
+		},
+		"task": {
+			"title": "任務"
+		},
+		"board": {
+			"columnCount_other": "{{count}} 欄",
+			"taskCount_other": "{{count}} 個任務"
+		},
+		"list": {
+			"count_other": "{{count}} 項"
+		},
+		"language": {
+			"system": "跟隨系統"
+		}
+	},
+	"mobile": {
+		"account": {
+			"deleteAccount": {
+				"sectionTitle": "危險區域",
+				"title": "刪除帳戶",
+				"description": "永久刪除你的帳戶及其資料。",
+				"modalTitle": "刪除你的帳戶？",
+				"modalDescription": "此操作會永久刪除你的帳戶，且無法復原。只有你一人的工作區會一併刪除。在其他工作區，你的任務會保留並變為未指派，你的留言會被移除。",
+				"confirmLabel": "輸入 {{email}} 以確認",
+				"password": "密碼",
+				"passwordHint": "如果登入時不使用密碼，請留空。",
+				"confirm": "刪除帳戶",
+				"success": "你的帳戶已刪除",
+				"sessionTooOld": "為了安全，請輸入密碼，或者登出後重新登入，再刪除帳戶。",
+				"wrongPassword": "密碼不正確。",
+				"noPassword": "此帳戶沒有密碼，請留空。"
+			}
+		},
+		"editor": {
+			"checklist": "待辦清單",
+			"numberedList": "編號清單",
+			"quote": "引用",
+			"linkUrl": "連結網址",
+			"applyLink": "套用",
+			"removeLink": "移除連結",
+			"hideKeyboard": "收起鍵盤"
+		}
+	}
+}
