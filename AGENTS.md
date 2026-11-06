@@ -120,7 +120,7 @@ tool/local_kaneo.sh stop     # 用完就停，省内存
 | `KANEO_DEV_EMAIL`、`KANEO_DEV_PASSWORD` | 开发账号，测账号密码登录时用 |
 | `KANEO_DEV_WORKSPACE_ID`、`KANEO_DEV_PROJECT_ID` | 示例工作区和 `Demo` 项目 |
 
-开发登录：构建时带上 `--dart-define-from-file=$HOME/.config/kaneo-app/dev.env`，App 没有登录状态时会用这个地址和 Key 自动登录，登录页也会多一个开发登录按钮。发布版忽略这些配置。
+开发登录：构建时带上 `--dart-define-from-file=$HOME/.config/kaneo-app/dev.env`，App 没有登录状态时会用这个地址和 Key 自动登录，登录页也会多一个开发登录按钮。发布版忽略这些配置。这样构建时登录状态只留在内存里，不写系统钥匙串，所以测试「重开后保持登录」时不要带 `dev.env`。
 
 服务端限制每个 API Key 每分钟 100 次请求，超过后返回 429 和 `Retry-After`。账号密码登录得到的令牌没有这个限制。需要大量请求的脚本和测试，用账号密码登录。
 

@@ -8,7 +8,12 @@ import 'core/core.dart';
 Future<ProviderContainer> bootstrap({SessionStorage? sessionStorage}) async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
-  final storage = sessionStorage ?? SecureSessionStorage();
+  // A build with dev.env signs in by itself on every launch, so it has nothing to keep. Staying out
+  // of the Keychain also avoids its permission prompts, which block the first frame on macOS when
+  // the build's signature changes, and leaves no development key behind.
+  final storage =
+      sessionStorage ??
+      (DevConfig.fromEnvironment().isConfigured ? MemorySessionStorage() : SecureSessionStorage());
   final choice = prefs.getString('kaneo.language') ?? systemLanguage;
   final i18n = await I18n.load(locale: activeLocale(choice));
   final cacheRoot = await defaultCacheRoot();

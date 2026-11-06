@@ -193,6 +193,25 @@ void main() {
       expect(offending.map((e) => e.key), isEmpty);
     });
 
+    test('every key the app asks for exists', () {
+      final english = {
+        ..._readFlat('assets/i18n/en-US.json'),
+        ..._readFlat('assets/i18n/overrides/en-US.json'),
+      };
+      final used = RegExp(r"'((?:mobile|app|settings|common|auth|tasks|navigation):[\w.]+)'");
+      final missing = <String>{};
+      for (final file in Directory('lib').listSync(recursive: true).whereType<File>()) {
+        if (!file.path.endsWith('.dart')) continue;
+        for (final match in used.allMatches(file.readAsStringSync())) {
+          final key = match[1]!.replaceFirst(':', '.');
+          if (!english.containsKey(key) && !english.containsKey('${key}_other')) {
+            missing.add(match[1]!);
+          }
+        }
+      }
+      expect(missing, isEmpty);
+    });
+
     test('apart from sign-in routes that are out of scope, mobile strings are translated', () {
       final english = _readFlat('assets/i18n/en-US.json');
       final chinese = {
