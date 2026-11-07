@@ -125,9 +125,25 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     session: () => ref.read(sessionProvider),
     i18n: ref.watch(i18nProvider),
     onSessionExpired: (expired) => ref.read(sessionProvider.notifier).expire(expired),
+    onServerReach: (reached) => ref.read(serverReachableProvider.notifier).report(reached),
     adapter: ref.watch(httpAdapterProvider),
   );
 });
+
+/// Whether the signed-in server answered the last request made to it. Pages keep showing what they
+/// last loaded when it doesn't, so this is what can tell the person that it may be out of date.
+final serverReachableProvider = NotifierProvider<ServerReachable, bool>(ServerReachable.new);
+
+class ServerReachable extends Notifier<bool> {
+  @override
+  bool build() {
+    // Another account or server starts with nothing known against it.
+    ref.watch(sessionProvider);
+    return true;
+  }
+
+  void report(bool reached) => state = reached;
+}
 
 /// Every Kaneo endpoint. Use `ref.read(kaneoApiProvider)` for writes and `lib/core/data/queries.dart`
 /// for reads.

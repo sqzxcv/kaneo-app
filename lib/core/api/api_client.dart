@@ -79,6 +79,7 @@ class ApiClient {
     required this._session,
     required this._i18n,
     required this._onSessionExpired,
+    this._onServerReach,
     HttpClientAdapter? adapter,
   }) : _dio = Dio(
          BaseOptions(
@@ -95,6 +96,10 @@ class ApiClient {
   final Session? Function() _session;
   final I18n _i18n;
   final void Function(Session expired) _onSessionExpired;
+
+  /// Told after each request to the signed-in server whether it got there: true for any answer,
+  /// errors too, and false when there was none.
+  final void Function(bool reached)? _onServerReach;
   final Dio _dio;
 
   /// Sends a request and returns the parsed body, or throws [ApiError] on any failure.
@@ -161,6 +166,8 @@ class ApiClient {
       if (body != null) 'Content-Type': 'application/json',
     };
 
+    // Requests to another server, such as while signing in, say nothing about this one.
+    final reach = session != null && server == session.serverUrl ? _onServerReach : null;
     final Response<String> response;
     try {
       response = await _dio.request<String>(
@@ -174,8 +181,10 @@ class ApiClient {
         options: Options(method: method, headers: headers),
       );
     } on DioException {
+      reach?.call(false);
       throw ApiError(_i18n.t('mobile:errors.unreachable'));
     }
+    reach?.call(true);
     return ApiResponse(response.statusCode ?? 0, response.headers.map, _parse(response.data));
   }
 

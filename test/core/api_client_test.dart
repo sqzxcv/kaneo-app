@@ -18,11 +18,13 @@ void main() {
   late I18n i18n;
   late Session? session;
   late List<Session> expired;
+  late List<bool> reached;
 
   ApiClient client({HttpClientAdapter? adapter}) => ApiClient(
     session: () => session,
     i18n: i18n,
     onSessionExpired: expired.add,
+    onServerReach: reached.add,
     adapter: adapter ?? server,
   );
 
@@ -48,6 +50,7 @@ void main() {
     );
     session = _session;
     expired = [];
+    reached = [];
   });
 
   group('normalizeServerUrl', () {
@@ -260,6 +263,37 @@ void main() {
               .having((e) => e.status, 'status', isNull),
         ),
       );
+    });
+  });
+
+  group('whether the server was reached', () {
+    test('an answer reaches it, an error too', () async {
+      await client().request('api/user/me');
+      server.failNext('api/user/me', status: 500);
+      await expectLater(client().request('api/user/me'), throwsA(isA<ApiError>()));
+      expect(reached, [true, true]);
+    });
+
+    test('no answer does not, until one comes', () async {
+      server.unreachable = true;
+      await expectLater(client().request('api/user/me'), throwsA(isA<ApiError>()));
+      server.unreachable = false;
+      await client().request('api/user/me');
+      expect(reached, [false, true]);
+    });
+
+    test('another server, or none signed in, says nothing about it', () async {
+      server.unreachable = true;
+      await expectLater(
+        client().requestRaw('api/config', serverUrl: 'https://other.test'),
+        throwsA(isA<ApiError>()),
+      );
+      session = null;
+      await expectLater(
+        client().requestRaw('api/config', serverUrl: FakeKaneo.serverUrl),
+        throwsA(isA<ApiError>()),
+      );
+      expect(reached, isEmpty);
     });
   });
 

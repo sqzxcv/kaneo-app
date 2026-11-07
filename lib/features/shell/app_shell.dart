@@ -9,6 +9,7 @@ import '../../core/core.dart';
 import '../inbox/notifications.dart';
 import '../realtime/user_sync.dart';
 import 'app_sidebar.dart';
+import 'server_banner.dart';
 
 /// Marks the page next to the navigation, so that tests can look inside the page only.
 const shellPageKey = ValueKey('shell-page');
@@ -99,7 +100,7 @@ class _WideShell extends StatelessWidget {
                     BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
                   ],
                 ),
-                child: page,
+                child: ServerBannerArea(page: page),
               ),
             ),
           ],
@@ -121,7 +122,11 @@ class _NarrowShell extends ConsumerWidget {
     final unread = ref.watch(inboxUnreadCountProvider);
     return Scaffold(
       // Pages draw their own top and bottom insets. A phone on its side has a notch on one side.
-      body: SafeArea(top: false, bottom: false, child: page),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: ServerBannerArea(page: page, insetTop: true),
+      ),
       bottomNavigationBar: index < 0
           ? null
           : DecoratedBox(

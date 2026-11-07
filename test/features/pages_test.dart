@@ -270,7 +270,9 @@ void main() {
     testBothLayouts('an unreachable server, in Chinese', (tester, size) async {
       final server = FakeKaneo()..unreachable = true;
       final app = await pumpKaneoApp(tester, server: server, size: size, locale: 'zh-CN');
-      expect(find.text(app.i18n.t('mobile:errors.unreachable')), findsOneWidget);
+      // Once on the page, and once in the banner above it that says the server is out of reach.
+      expect(inPage(find.text(app.i18n.t('mobile:errors.unreachable'))), findsOneWidget);
+      expect(find.text(app.i18n.t('mobile:errors.unreachable')), findsNWidgets(2));
       expect(app.i18n.t('mobile:errors.unreachable'), isNot(contains('mobile:')));
       expect(find.textContaining('DioException'), findsNothing);
     });
