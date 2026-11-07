@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/core.dart';
+import 'new_task_page.dart';
 import 'task_panel.dart';
 
 /// Opens a task from a list or a board: a panel over the page on wide windows, so that the page
@@ -32,9 +33,19 @@ void openTaskPage(BuildContext context, String taskId) {
   context.push(AppRoutes.task(taskId));
 }
 
-/// Opens the new-task form. [status] preselects a column when creating from that column.
+/// Opens the new-task form: a dialog over the page on wide windows, so that the page stays in view,
+/// and a full page on narrow ones. [status] preselects a column when creating from that column.
 ///
-/// KAN-9 replaces the body: a centered dialog on wide windows and a full page on narrow ones.
+/// A narrow one goes through the router so that a phone leaves the board's landscape while typing.
 void openNewTask(BuildContext context, {String? projectId, String? status}) {
-  context.push(AppRoutes.newTask(projectId: projectId, status: status));
+  if (!context.isWide || ModalRoute.of(context) == null) {
+    context.push(AppRoutes.newTask(projectId: projectId, status: status));
+    return;
+  }
+  showPanel<void>(
+    context,
+    title: context.t('mobile:board.newTask'),
+    maxWidth: newTaskFormWidth,
+    builder: (context) => NewTaskForm(projectId: projectId, status: status),
+  );
 }

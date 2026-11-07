@@ -45,8 +45,7 @@ BoardData boardWithTask(BoardData board, Task task, {String? assigneeImage}) {
       if (t.id != task.id) t,
   ];
   // A change of status keeps the task's position, so this is where the server will have it too.
-  List<BoardTask> into(List<BoardTask>? tasks) => [...without(tasks), updated]
-    ..sort((a, b) => (a.position ?? double.maxFinite).compareTo(b.position ?? double.maxFinite));
+  List<BoardTask> into(List<BoardTask>? tasks) => _inPlace(without(tasks), updated);
 
   return board.copyWith(
     columns: [
@@ -59,6 +58,32 @@ BoardData boardWithTask(BoardData board, Task task, {String? assigneeImage}) {
     archivedTasks: !inColumn && status == statusArchived
         ? into(board.archivedTasks)
         : without(board.archivedTasks),
+  );
+}
+
+List<BoardTask> _inPlace(List<BoardTask> tasks, BoardTask card) =>
+    [...tasks, card]
+      ..sort((a, b) => (a.position ?? double.maxFinite).compareTo(b.position ?? double.maxFinite));
+
+/// [board] with [card], a task it didn't have yet, in the column of its status. A status with nowhere
+/// to show leaves the board as it is, and so does a card already there, which is the newer of the two.
+BoardData boardWithNewCard(BoardData board, BoardTask card) {
+  if (boardTasks(board).any((t) => t.id == card.id)) return board;
+  final status = card.status;
+  final inColumn = board.columns.any((c) => c.slug == status);
+  return board.copyWith(
+    columns: [
+      for (final column in board.columns)
+        column.slug == status
+            ? column.copyWith(tasks: _inPlace(column.tasks ?? const [], card))
+            : column,
+    ],
+    plannedTasks: !inColumn && status == statusPlanned
+        ? _inPlace(board.plannedTasks, card)
+        : board.plannedTasks,
+    archivedTasks: !inColumn && status == statusArchived
+        ? _inPlace(board.archivedTasks, card)
+        : board.archivedTasks,
   );
 }
 

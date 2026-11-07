@@ -41,9 +41,9 @@ class TaskProperties extends ConsumerWidget {
       required String? value,
       required void Function(String? date) onChanged,
       Color? color,
-    }) => _PropertyRow(
+    }) => PropertyRow(
       label: label,
-      child: _PropertyValue(
+      child: PropertyValue(
         key: key,
         onPressed: canEdit
             ? (anchor) async {
@@ -53,7 +53,7 @@ class TaskProperties extends ConsumerWidget {
                 onChanged(picked.value == null ? null : toApiDate(picked.value!));
               }
             : null,
-        child: _IconAndText(
+        child: PropertyText(
           icon: Icon(icon, size: 14, color: color ?? colors.mutedForeground),
           text: value == null ? context.t('tasks:properties.noDate') : formatDate(i18n, value),
           color: value == null ? colors.mutedForeground : color,
@@ -64,31 +64,20 @@ class TaskProperties extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _PropertyRow(
+        PropertyRow(
           label: context.t('mobile:taskFields.status'),
-          child: _PropertyValue(
+          child: PropertyValue(
             key: const ValueKey('task-status'),
             onPressed: canEdit ? (anchor) => _pickStatus(anchor, ref, edits) : null,
-            child: _IconAndText(
-              icon: Icon(
-                boardColumnIcon(
-                  BoardColumn(
-                    id: task.status,
-                    slug: task.status,
-                    name: task.status,
-                    icon: column?.icon,
-                    isFinal: column?.isFinal,
-                  ),
-                ),
-                size: 14,
-              ),
-              text: _statusName(context, task.status, columns),
+            child: PropertyText(
+              icon: Icon(taskStatusIcon(task.status, column), size: 14),
+              text: taskStatusName(context, task.status, columns),
             ),
           ),
         ),
-        _PropertyRow(
+        PropertyRow(
           label: context.t('mobile:taskFields.priority'),
-          child: _PropertyValue(
+          child: PropertyValue(
             key: const ValueKey('task-priority'),
             onPressed: canEdit
                 ? (anchor) async {
@@ -96,28 +85,22 @@ class TaskProperties extends ConsumerWidget {
                     if (picked != null && picked != task.priority) edits.setPriority(picked);
                   }
                 : null,
-            child: _IconAndText(
+            child: PropertyText(
               icon: Icon(
                 LucideIcons.signal,
                 size: 14,
-                color: switch (task.priority) {
-                  'urgent' => colors.priorityUrgent,
-                  'high' => colors.priorityHigh,
-                  'medium' => colors.priorityMedium,
-                  'low' => colors.priorityLow,
-                  _ => colors.mutedForeground,
-                },
+                color: priorityColor(context, task.priority),
               ),
               text: priorityLabel(context, task.priority),
             ),
           ),
         ),
-        _PropertyRow(
+        PropertyRow(
           label: context.t('mobile:taskFields.assignee'),
-          child: _PropertyValue(
+          child: PropertyValue(
             key: const ValueKey('task-assignee'),
             onPressed: canAssign ? (anchor) => _pickAssignee(anchor, ref, edits) : null,
-            child: _IconAndText(
+            child: PropertyText(
               icon: CircleAvatar(
                 radius: 9,
                 backgroundColor: colors.avatar,
@@ -133,13 +116,13 @@ class TaskProperties extends ConsumerWidget {
             ),
           ),
         ),
-        _PropertyRow(
+        PropertyRow(
           label: context.t('mobile:taskFields.labels'),
-          child: _PropertyValue(
+          child: PropertyValue(
             key: const ValueKey('task-labels'),
             onPressed: canLabel ? (anchor) => _pickLabels(anchor, ref, edits, can) : null,
             child: labels.isEmpty
-                ? _IconAndText(
+                ? PropertyText(
                     icon: Icon(LucideIcons.tag, size: 14, color: colors.mutedForeground),
                     text: context.t(
                       canLabel ? 'tasks:properties.addLabels' : 'mobile:taskFields.none',
@@ -149,7 +132,7 @@ class TaskProperties extends ConsumerWidget {
                 : Wrap(
                     spacing: 10,
                     runSpacing: 4,
-                    children: [for (final label in labels) _LabelText(label: label)],
+                    children: [for (final label in labels) PropertyLabel(label: label)],
                   ),
           ),
         ),
@@ -246,7 +229,23 @@ class TaskProperties extends ConsumerWidget {
   Future<T> _orFetch<T>(T? cached, Future<T> Function() fetch) async => cached ?? await fetch();
 }
 
-String _statusName(BuildContext context, String status, List<ProjectColumn> columns) {
+/// The icon for [status], whose column is [column] if it has one.
+IconData taskStatusIcon(String status, ProjectColumn? column) => boardColumnIcon(
+  BoardColumn(id: status, slug: status, name: status, icon: column?.icon, isFinal: column?.isFinal),
+);
+
+Color priorityColor(BuildContext context, String? priority) {
+  final colors = context.colors;
+  return switch (priority) {
+    'urgent' => colors.priorityUrgent,
+    'high' => colors.priorityHigh,
+    'medium' => colors.priorityMedium,
+    'low' => colors.priorityLow,
+    _ => colors.mutedForeground,
+  };
+}
+
+String taskStatusName(BuildContext context, String status, List<ProjectColumn> columns) {
   final column = columns.where((c) => c.slug == status).firstOrNull;
   if (column != null) return column.name;
   return switch (status) {
@@ -256,8 +255,8 @@ String _statusName(BuildContext context, String status, List<ProjectColumn> colu
   };
 }
 
-class _PropertyRow extends StatelessWidget {
-  const _PropertyRow({required this.label, required this.child});
+class PropertyRow extends StatelessWidget {
+  const PropertyRow({super.key, required this.label, required this.child});
 
   final String label;
   final Widget child;
@@ -292,17 +291,21 @@ class _PropertyRow extends StatelessWidget {
 
 /// The pressable part of a row. It hands the press its own context, for the picker to open beside,
 /// and ignores another press until that has finished.
-class _PropertyValue extends StatefulWidget {
-  const _PropertyValue({super.key, required this.onPressed, required this.child});
+///
+/// With [chip] it stands alone, as the web app's new-task dialog has it: as wide as its content, in
+/// a border.
+class PropertyValue extends StatefulWidget {
+  const PropertyValue({super.key, required this.onPressed, required this.child, this.chip = false});
 
   final Future<void> Function(BuildContext anchor)? onPressed;
   final Widget child;
+  final bool chip;
 
   @override
-  State<_PropertyValue> createState() => _PropertyValueState();
+  State<PropertyValue> createState() => PropertyValueState();
 }
 
-class _PropertyValueState extends State<_PropertyValue> {
+class PropertyValueState extends State<PropertyValue> {
   bool _open = false;
 
   Future<void> _press() async {
@@ -317,23 +320,34 @@ class _PropertyValueState extends State<_PropertyValue> {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    final radius = BorderRadius.circular(KaneoRadius.md);
+    final button = Material(
       type: MaterialType.transparency,
       child: InkWell(
-        borderRadius: BorderRadius.circular(KaneoRadius.md),
+        borderRadius: radius,
         hoverColor: context.colors.accent,
         onTap: widget.onPressed == null ? null : _press,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-          child: Align(alignment: Alignment.centerLeft, child: widget.child),
+          padding: EdgeInsets.symmetric(horizontal: widget.chip ? 10 : 8, vertical: 7),
+          child: widget.chip
+              ? widget.child
+              : Align(alignment: Alignment.centerLeft, child: widget.child),
         ),
       ),
+    );
+    if (!widget.chip) return button;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        border: Border.all(color: context.colors.border),
+      ),
+      child: button,
     );
   }
 }
 
-class _IconAndText extends StatelessWidget {
-  const _IconAndText({required this.icon, required this.text, this.color});
+class PropertyText extends StatelessWidget {
+  const PropertyText({super.key, required this.icon, required this.text, this.color});
 
   final Widget icon;
   final String text;
@@ -358,8 +372,8 @@ class _IconAndText extends StatelessWidget {
   }
 }
 
-class _LabelText extends StatelessWidget {
-  const _LabelText({required this.label});
+class PropertyLabel extends StatelessWidget {
+  const PropertyLabel({super.key, required this.label});
 
   final Label label;
 

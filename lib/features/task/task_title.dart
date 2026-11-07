@@ -4,6 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/core.dart';
 import 'task_edits.dart';
 
+/// [text] as a title, which is one line. Line breaks can only get in by pasting, because there are no
+/// input formatters to disturb an input method.
+String singleLineTitle(String text) => text.replaceAll(RegExp(r'\s*[\r\n]+\s*'), ' ').trim();
+
 /// A task's title, in a text box that looks like a heading. It saves when the person leaves it.
 ///
 /// There are no input formatters, because they disturb an input method. Line breaks pasted in come
@@ -54,7 +58,7 @@ class _TaskTitleState extends ConsumerState<TaskTitle> {
   /// An empty title isn't a change. The task goes back to the one it has.
   void _save({bool leaving = false}) {
     if (_controller.text == widget.task.title) return;
-    final title = _controller.text.replaceAll(RegExp(r'\s*[\r\n]+\s*'), ' ').trim();
+    final title = singleLineTitle(_controller.text);
     if (title.isNotEmpty && title != widget.task.title) {
       _edits.setTitle(title, leaving: leaving);
     }

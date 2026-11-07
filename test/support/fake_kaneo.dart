@@ -1165,18 +1165,61 @@ class FakeKaneo implements HttpClientAdapter {
     _route('POST', 'api/task/:projectId', (request, params) {
       _find(projects, params[0], 'Project');
       final body = _body(request);
-      return _taskDetail(
-        addTask(
-          projectId: params[0],
-          title: body['title'] as String,
-          description: body['description'] as String? ?? '',
-          status: body['status'] as String? ?? 'to-do',
-          priority: body['priority'] as String? ?? 'no-priority',
-          assigneeId: body['userId'] as String?,
-          startDate: body['startDate'] as String?,
-          dueDate: body['dueDate'] as String?,
-        ),
+      // Like the server, this takes only a column of the project or a status every project has.
+      final status = body['status'] as String? ?? 'to-do';
+      final valid = {
+        for (final column in columns)
+          if (column['projectId'] == params[0]) column['slug'],
+        'planned',
+        'archived',
+      };
+      if (!valid.contains(status)) {
+        return _error(400, 'Invalid status "$status".', 'BAD_REQUEST');
+      }
+      // Like the server, this fills in a required custom field left out with its default. It is
+      // refused only when there is no default, which a field can't be defined without.
+      final provided = {
+        for (final field in body['customFields'] as List? ?? const [])
+          (field as Map)['fieldId']: field['value'],
+      };
+      final fields = [
+        for (final field in customFields)
+          if (field['projectId'] == params[0]) field,
+      ];
+      for (final field in fields) {
+        final hasDefault = (field['defaultValue'] as String? ?? '').trim().isNotEmpty;
+        if (field['required'] == true && !provided.containsKey(field['id']) && !hasDefault) {
+          return _error(
+            400,
+            'Custom field "${field['name']}" is required to create a task.',
+            'BAD_REQUEST',
+          );
+        }
+      }
+      final task = addTask(
+        projectId: params[0],
+        title: body['title'] as String,
+        description: body['description'] as String? ?? '',
+        status: status,
+        priority: body['priority'] as String? ?? 'no-priority',
+        assigneeId: body['userId'] as String?,
+        startDate: body['startDate'] as String?,
+        dueDate: body['dueDate'] as String?,
       );
+      for (final field in fields) {
+        final value =
+            provided[field['id']] ?? (field['required'] == true ? field['defaultValue'] : null);
+        if (value == null) continue;
+        customFieldValues.add({
+          'id': _id('field-value'),
+          'taskId': task['id'],
+          'fieldId': field['id'],
+          'value': value,
+          'fieldName': field['name'],
+          'fieldType': field['type'],
+        });
+      }
+      return _taskDetail(task);
     });
     _route('PUT', 'api/task/:id', (request, params) {
       // Like the server, this replaces the whole task, so an optional field left out is cleared.

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kaneo_app/core/core.dart';
 import 'package:kaneo_app/features/auth/login_page.dart';
 import 'package:kaneo_app/features/shell/app_sidebar.dart';
+import 'package:kaneo_app/features/task/new_task_page.dart';
 import 'package:kaneo_app/features/task/open_task.dart';
 
 import '../support/test_app.dart';
@@ -69,9 +70,15 @@ void main() {
 
       router.pop();
       await tester.pumpAndSettle();
+      final before = router.state.uri.toString();
       openNewTask(tester.element(find.byType(Scaffold).last), projectId: 'p1', status: 'done');
       await tester.pumpAndSettle();
-      expect(router.state.uri.toString(), '/task/new?projectId=p1&status=done');
+      expect(find.byType(NewTaskForm), findsOneWidget);
+      // A dialog on a wide window doesn't change the location.
+      expect(
+        router.state.uri.toString(),
+        size == wideSize ? before : '/task/new?projectId=p1&status=done',
+      );
     });
 
     testBothLayouts('`new` is not read as a task id', (tester, size) async {

@@ -73,7 +73,7 @@ void main() {
     router.pop();
     await tester.pump(const Duration(milliseconds: 500));
 
-    // The new-task placeholder.
+    // The new-task page.
     router.push(AppRoutes.newTask(projectId: config.projectId));
     await waitFor(tester, find.text(container.read(i18nProvider).t('mobile:board.newTask')));
     router.pop();
