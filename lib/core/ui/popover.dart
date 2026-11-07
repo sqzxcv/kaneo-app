@@ -360,7 +360,12 @@ class _HoverHighlightState extends State<HoverHighlight> {
           color: _hovered && widget.enabled ? context.colors.accent : null,
           borderRadius: BorderRadius.circular(widget.borderRadius),
         ),
-        child: widget.child,
+        // Ink must paint above the hover background rather than on the popover's Material.
+        child: Material(
+          type: MaterialType.transparency,
+          borderRadius: BorderRadius.circular(widget.borderRadius),
+          child: widget.child,
+        ),
       ),
     );
   }
