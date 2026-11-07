@@ -408,6 +408,17 @@ void main() {
     await see(tester, row(parent.id));
     expect(find.byKey(const ValueKey('filter-count')), findsOneWidget);
     await shot(tester, '07-list-filtered');
+    final listHorizontal = page(
+      find.byWidgetPredicate(
+        (widget) => widget is SingleChildScrollView && widget.scrollDirection == Axis.horizontal,
+      ),
+    );
+    if (listHorizontal.evaluate().isNotEmpty) {
+      final scroll = tester.widget<SingleChildScrollView>(listHorizontal).controller!;
+      scroll.jumpTo(scroll.position.maxScrollExtent);
+      await shot(tester, '07b-list-metadata');
+      scroll.jumpTo(0);
+    }
     await tap(tester, find.byTooltip('Reset'));
     await tap(tester, find.byKey(ValueKey('expand-task-${parent.id}')));
     await see(tester, row(child.id));
@@ -432,7 +443,12 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('B Archived item'),
       500,
-      scrollable: page(find.byType(Scrollable)).last,
+      scrollable: find
+          .descendant(
+            of: find.byKey(PageStorageKey('board-list-${project.id}')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
       maxScrolls: 50,
     );
     expect(find.text('B Archived item'), findsOneWidget);
