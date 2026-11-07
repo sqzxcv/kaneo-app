@@ -5,7 +5,16 @@ import 'package:kaneo_app/core/core.dart';
 
 const desktopTestServer = String.fromEnvironment('KANEO_DEV_SERVER_URL');
 
-Future<({KaneoApi ownerApi, KaneoApi actorApi, Project project, Session owner})>
+Future<
+  ({
+    KaneoApi ownerApi,
+    KaneoApi actorApi,
+    Project project,
+    Session owner,
+    Session actor,
+    String actorPassword,
+  })
+>
 createDesktopFixture(I18n i18n) async {
   expect(['localhost', '127.0.0.1'].contains(Uri.parse(desktopTestServer).host), isTrue);
   final anonymous = ApiClient(session: () => null, i18n: i18n, onSessionExpired: (_) {});
@@ -33,6 +42,7 @@ createDesktopFixture(I18n i18n) async {
     slug: 'D${stamp.toUpperCase()}',
   );
   addTearDown(() => ownerApi.deleteProject(project.id));
+  addTearDown(() => ownerApi.clearAllNotifications(workspaceId: workspace.id));
   final email = 'd-desktop-$stamp@example.invalid';
   final password = 'D-test-$stamp-password';
   await anonymous.request(
@@ -56,5 +66,12 @@ createDesktopFixture(I18n i18n) async {
     body: {'organizationId': workspace.id, 'email': email, 'role': 'member'},
   ) as Map<String, dynamic>;
   await actorApi.acceptInvitation(invitation['id'] as String);
-  return (ownerApi: ownerApi, actorApi: actorApi, project: project, owner: owner);
+  return (
+    ownerApi: ownerApi,
+    actorApi: actorApi,
+    project: project,
+    owner: owner,
+    actor: actor,
+    actorPassword: password,
+  );
 }
