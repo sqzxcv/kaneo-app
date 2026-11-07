@@ -69,3 +69,22 @@ String initials(String? name) {
   if (parts.length == 1) return head(parts.first, 2).toUpperCase();
   return '${head(parts.first, 1)}${head(parts.last, 1)}'.toUpperCase();
 }
+
+final _image = RegExp(r'!\[[^\]]*\]\([^)]*\)');
+final _link = RegExp(r'\[([^\]]*)\]\([^)]*\)');
+final _tag = RegExp(r'<[^>]*>');
+final _lineMark = RegExp(r'^\s*(?:#{1,6}\s+|>\s*)', multiLine: true);
+final _inlineMark = RegExp(r'\*+|`+|~~');
+final _space = RegExp(r'\s+');
+
+/// A comment as one line of text, for lists. The server keeps the markup the editor stored, where a
+/// mention is a tag and an image a link. Underscores stay, because a preview that turns `snake_case`
+/// into `snakecase` no longer shows the words that were searched for.
+String plainPreview(String markup) => markup
+    .replaceAll(_image, ' ')
+    .replaceAllMapped(_link, (match) => match[1]!)
+    .replaceAll(_tag, ' ')
+    .replaceAll(_lineMark, '')
+    .replaceAll(_inlineMark, '')
+    .replaceAll(_space, ' ')
+    .trim();

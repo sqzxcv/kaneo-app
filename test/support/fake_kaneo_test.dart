@@ -190,6 +190,50 @@ void main() {
     );
   });
 
+  group('search', () {
+    List<SearchResult> found(SearchResponse response, String type) =>
+        response.results.where((r) => r.type == type).toList();
+
+    test('finds tasks, projects and comments, the way the server names them', () async {
+      server.addProject(id: 'rocket', name: 'Rocket launch', slug: 'RKT');
+      server.addTask(id: 'fuel', projectId: 'rocket', title: 'Fuel', description: 'For the rocket');
+      server.addComment('task-2', 'About the rocket');
+
+      final response = await api.search('rocket', FakeKaneo.workspaceId);
+      expect(found(response, 'task').single.id, 'fuel');
+      expect(found(response, 'project').single.id, 'rocket');
+      final comment = found(response, 'comment').single;
+      expect(comment.content, 'About the rocket');
+      expect(comment.title, 'Comment on Write the first description');
+      expect(comment.projectSlug, 'DEMO');
+      expect(comment.taskNumber, 2);
+    });
+
+    test('also finds the activity of a task whose title matches, as the server does', () async {
+      final response = await api.search('board', FakeKaneo.workspaceId);
+      expect(found(response, 'task').single.id, 'task-3');
+      expect(found(response, 'activity').single.content, isNull);
+    });
+
+    test('puts the best matches first, and can look for one kind', () async {
+      server.addComment('task-2', 'About the board');
+      final all = await api.search('board', FakeKaneo.workspaceId);
+      expect(all.results.map((r) => r.type), ['task', 'comment', 'activity']);
+
+      final comments = await api.search('board', FakeKaneo.workspaceId, type: 'comments');
+      expect(comments.results.map((r) => r.type), ['comment']);
+    });
+
+    test('stops at the limit, and counts everything', () async {
+      for (var i = 0; i < 40; i++) {
+        server.addTask(title: 'Rocket $i');
+      }
+      final response = await api.search('rocket', FakeKaneo.workspaceId);
+      expect(response.results, hasLength(30));
+      expect(response.totalCount, 80);
+    });
+  });
+
   test('an unknown route is a 404', () async {
     await expectLater(
       client.request('api/nope'),

@@ -294,7 +294,7 @@ void main() {
 
   test('search', () async {
     final found = await api.search('board', workspace);
-    expect(found.results.single.title, 'Review the board layout');
+    expect(found.results.first.title, 'Review the board layout');
     expect(server.requests.last.query, containsPair('limit', '30'));
     expect(server.requests.last.query, containsPair('type', 'all'));
   });

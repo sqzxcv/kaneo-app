@@ -808,34 +808,107 @@ class FakeKaneo implements HttpClientAdapter {
     };
   }
 
+  /// Finds what the real server finds, scored and limited the same way. What differs between result
+  /// kinds is there too: comments and other activity name their task only by ticket id.
   Map<String, dynamic> _search(FakeRequest request) {
     final query = (request.query['q'] ?? '').toLowerCase();
-    final results = [
-      for (final task in tasks)
-        if ((task['title'] as String).toLowerCase().contains(query))
-          () {
-            final project = projects.firstWhere((p) => p['id'] == task['projectId']);
-            return {
-              'id': task['id'],
-              'type': 'task',
-              'title': task['title'],
-              'description': task['description'],
+    final type = request.query['type'] ?? 'all';
+    final limit = int.parse(request.query['limit'] ?? '20');
+    bool has(Object? text) => '${text ?? ''}'.toLowerCase().contains(query);
+    bool wanted(String kind) => type == 'all' || type == kind;
+    final workspaceName = workspaces.first['name'];
+
+    final results = <Map<String, dynamic>?>[
+      if (wanted('tasks'))
+        for (final task in tasks)
+          if (has(task['title']) || has(task['description']))
+            () {
+              final project = projects.firstWhere((p) => p['id'] == task['projectId']);
+              return <String, dynamic>{
+                'id': task['id'],
+                'type': 'task',
+                'title': task['title'],
+                'description': task['description'],
+                'projectId': project['id'],
+                'projectName': project['name'],
+                'projectSlug': project['slug'],
+                'workspaceId': workspaceId,
+                'workspaceName': workspaceName,
+                'userId': task['userId'],
+                'userName': _member(task['userId'] as String?)['name'],
+                'createdAt': task['createdAt'],
+                'relevanceScore': has(task['title']) ? 3 : 2,
+                'taskNumber': task['number'],
+                'priority': task['priority'],
+                'status': task['status'],
+              };
+            }(),
+      if (wanted('projects'))
+        for (final project in projects)
+          if (has(project['name']) || has(project['description']))
+            {
+              'id': project['id'],
+              'type': 'project',
+              'title': project['name'],
+              if (project['description'] != null) 'description': project['description'],
               'projectId': project['id'],
-              'projectName': project['name'],
               'projectSlug': project['slug'],
               'workspaceId': workspaceId,
-              'workspaceName': workspaces.first['name'],
-              'userId': task['userId'],
-              'userName': _member(task['userId'] as String?)['name'],
-              'createdAt': task['createdAt'],
-              'relevanceScore': 1,
-              'taskNumber': task['number'],
-              'priority': task['priority'],
-              'status': task['status'],
-            };
-          }(),
-    ];
-    return {'results': results, 'totalCount': results.length, 'searchQuery': request.query['q']};
+              'workspaceName': workspaceName,
+              'createdAt': project['createdAt'],
+              'relevanceScore': has(project['name']) ? 3 : 2,
+            },
+      if (wanted('workspaces'))
+        for (final workspace in workspaces)
+          if (has(workspace['name']))
+            {
+              'id': workspace['id'],
+              'type': 'workspace',
+              'title': workspace['name'],
+              'workspaceId': workspace['id'],
+              'workspaceName': workspace['name'],
+              'createdAt': _now,
+              'relevanceScore': 3,
+            },
+      if (type == 'all' || type == 'comments' || type == 'activities')
+        for (final activity in activities)
+          if (type != 'comments' || activity['type'] == 'comment')
+            () {
+              final task = tasks.firstWhere((t) => t['id'] == activity['taskId']);
+              final inContent = has(activity['content']);
+              if (!inContent && !has(task['title'])) return null;
+              final project = projects.firstWhere((p) => p['id'] == task['projectId']);
+              final isComment = activity['type'] == 'comment';
+              return <String, dynamic>{
+                'id': activity['id'],
+                'type': isComment ? 'comment' : 'activity',
+                'title': '${isComment ? 'Comment' : activity['type']} on ${task['title']}',
+                if (activity['content'] != null) 'content': activity['content'],
+                'projectId': project['id'],
+                'projectName': project['name'],
+                'projectSlug': project['slug'],
+                'workspaceId': workspaceId,
+                'workspaceName': workspaceName,
+                'userId': activity['userId'],
+                'userName': _member(activity['userId'] as String?)['name'],
+                'createdAt': activity['createdAt'],
+                'relevanceScore': inContent ? 2 : 1,
+                'taskNumber': task['number'],
+              };
+            }(),
+    ].nonNulls.toList();
+
+    results.sort((a, b) {
+      final byScore = (b['relevanceScore'] as int).compareTo(a['relevanceScore'] as int);
+      return byScore != 0
+          ? byScore
+          : (b['createdAt'] as String).compareTo(a['createdAt'] as String);
+    });
+    return {
+      'results': results.take(limit).toList(),
+      'totalCount': results.length,
+      'searchQuery': request.query['q'],
+    };
   }
 
   Map<String, dynamic> _fullOrganization(String id) {

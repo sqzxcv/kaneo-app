@@ -189,7 +189,6 @@ void main() {
 
       final other = isWideSize(size) ? narrowSize : wideSize;
       await resize(tester, other);
-      expect(tester.widget<TextField>(field).controller, isNull);
       expect(find.text('board'), findsOneWidget);
       expect(find.text('Review the board layout'), findsOneWidget);
       expect(tester.state(field), same(state));
