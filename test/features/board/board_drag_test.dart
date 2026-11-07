@@ -404,6 +404,32 @@ void main() {
       expect(server.tasks.firstWhere((t) => t['id'] == 'task-1')['position'], 0);
     });
 
+    // Let go, the card in the hand used to vanish for a frame, then reappear off to one side.
+    onIOS('let go, the card goes on from the hand without a blink or a jump', (tester, size) async {
+      final server = FakeKaneo()..relations.clear();
+      await pumpBoard(tester, server, size);
+      final gesture = await tester.startGesture(cardBody(tester, 'task-1'));
+      await tester.pump(held);
+      await goTo(tester, gesture, inProgress(tester));
+      await tester.pump(const Duration(milliseconds: 200));
+      final inHand = tester.getRect(lifted());
+      await gesture.up();
+      await tester.pump();
+      final landing = find.descendant(
+        of: find.byType(CardLanding),
+        matching: find.byType(BoardCard),
+      );
+      expect(landing, findsOneWidget, reason: 'Nothing shows the card for a frame');
+      expect((tester.getRect(landing).center - inHand.center).distance, lessThan(1));
+      final placed = tester.widget<Opacity>(
+        find.ancestor(of: card('task-1'), matching: find.byType(Opacity)).first,
+      );
+      expect(placed.opacity, 0, reason: 'The card shows twice');
+      await tester.pumpAndSettle();
+      expect(find.byType(CardLanding), findsNothing);
+      expect(statusOf(server, 'task-1'), 'in-progress');
+    });
+
     testBothLayouts('a click that wobbles a little opens the card, as on the web', (
       tester,
       size,
