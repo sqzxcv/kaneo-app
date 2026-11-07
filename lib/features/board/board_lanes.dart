@@ -223,33 +223,37 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
     return box == null ? null : box.localToGlobal(Offset.zero) & box.size;
   }
 
-  /// Lets [card], let go of at [from], settle into its place on the board.
+  /// Lets [card], let go of at [from], settle into its place on the board. It takes over from the
+  /// card in the hand in the same frame, and moves once the board has laid the card out.
   void _land(String id, Rect from, Widget card) {
     if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return;
+    final overlay = Overlay.of(context);
+    // The overlay need not start at the screen's corner: on a wide screen it sits beside the
+    // sidebar.
+    final origin = (overlay.context.findRenderObject()! as RenderBox).localToGlobal(Offset.zero);
+    final to = ValueNotifier<Rect?>(null);
+    late final OverlayEntry entry;
+    void done() {
+      entry.remove();
+      to.dispose();
+      if (_landingEntry == entry) _landingEntry = null;
+      if (mounted && _landing == id) setState(() => _landing = null);
+    }
+
+    entry = OverlayEntry(
+      builder: (context) =>
+          CardLanding(from: from.shift(-origin), to: to, onDone: done, child: card),
+    );
+    _landingEntry?.remove();
+    _landingEntry = entry;
+    overlay.insert(entry);
     setState(() => _landing = id);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _landing != id) return;
-      final to = _cardRect(id);
-      if (to == null) {
-        setState(() => _landing = null);
-        return;
-      }
-      _landingEntry?.remove();
-      late final OverlayEntry entry;
-      entry = OverlayEntry(
-        builder: (context) => CardLanding(
-          from: from,
-          to: to,
-          onDone: () {
-            entry.remove();
-            if (_landingEntry == entry) _landingEntry = null;
-            if (mounted && _landing == id) setState(() => _landing = null);
-          },
-          child: card,
-        ),
-      );
-      _landingEntry = entry;
-      Overlay.of(context).insert(entry);
+      if (!mounted || _landingEntry != entry) return;
+      final rect = _cardRect(id);
+      // Off screen, there is nowhere to see it land.
+      if (rect == null) return done();
+      to.value = rect.shift(-origin);
     });
   }
 

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:kaneo_app/core/core.dart';
@@ -41,7 +42,7 @@ class LiftedCard extends StatelessWidget {
 }
 
 /// A card let go of, settling from where it was in the hand, [from], into its place, [to]. Shown
-/// in an overlay; [onDone] removes it.
+/// in an overlay, in its coordinates, from the moment the card is let go; [onDone] removes it.
 class CardLanding extends StatefulWidget {
   const CardLanding({
     super.key,
@@ -52,7 +53,10 @@ class CardLanding extends StatefulWidget {
   });
 
   final Rect from;
-  final Rect to;
+
+  /// Where the card lands, once the board has laid it out there. Until then it stays where it was
+  /// let go of, just as it was in the hand, so that it never leaves the screen for a frame.
+  final ValueListenable<Rect?> to;
   final VoidCallback onDone;
   final Widget child;
 
@@ -64,9 +68,21 @@ class _CardLandingState extends State<CardLanding> with SingleTickerProviderStat
   late final _controller = AnimationController(vsync: this);
 
   @override
+  void initState() {
+    super.initState();
+    widget.to.addListener(_land);
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _land();
+  }
+
+  void _land() {
+    if (!mounted || widget.to.value == null) return;
     if (_controller.isAnimating || _controller.isCompleted) return;
+    setState(() {});
     _controller
       ..duration = _motion(context, 250)
       ..forward().whenComplete(widget.onDone);
@@ -74,6 +90,7 @@ class _CardLandingState extends State<CardLanding> with SingleTickerProviderStat
 
   @override
   void dispose() {
+    widget.to.removeListener(_land);
     _controller.dispose();
     super.dispose();
   }
@@ -83,7 +100,7 @@ class _CardLandingState extends State<CardLanding> with SingleTickerProviderStat
     animation: _controller,
     builder: (context, child) {
       final settled = Curves.easeOutCubic.transform(_controller.value);
-      final rect = Rect.lerp(widget.from, widget.to, settled)!;
+      final rect = Rect.lerp(widget.from, widget.to.value ?? widget.from, settled)!;
       // As tall as the card is drawn, which can change as it lands in another column.
       return Positioned(
         left: rect.left,
