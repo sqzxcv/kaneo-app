@@ -43,7 +43,7 @@ class BoardCard extends StatelessWidget {
       _ => colors.chipMuted,
     };
     final onMenu = this.onMenu;
-    return MenuGestures(
+    final card = MenuGestures(
       onMenu: onMenu == null ? null : (position) => onMenu(context, task, position),
       longPressDevices: lifts ? const <PointerDeviceKind>{} : null,
       child: Material(
@@ -174,6 +174,13 @@ class BoardCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+    if (!lifts) return card;
+    // A tooltip answers a finger's long press too, which picks this card up instead. A mouse still
+    // shows it on hover.
+    return TooltipTheme(
+      data: TooltipTheme.of(context).copyWith(triggerMode: TooltipTriggerMode.manual),
+      child: card,
     );
   }
 }

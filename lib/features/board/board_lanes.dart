@@ -27,7 +27,6 @@ class BoardLanes extends ConsumerStatefulWidget {
     super.key,
     required this.board,
     required this.onMove,
-    this.busy = false,
     this.canCreate = true,
     this.canMove = true,
     this.onMenu,
@@ -38,7 +37,6 @@ class BoardLanes extends ConsumerStatefulWidget {
   final BoardData board;
   final BoardData? sourceBoard;
   final String? emptyMessage;
-  final bool busy;
 
   /// Whether the member may create tasks. Without it the columns offer no new ones.
   final bool canCreate;
@@ -46,6 +44,8 @@ class BoardLanes extends ConsumerStatefulWidget {
   /// Whether the member may change tasks. Without it the cards can't be picked up.
   final bool canMove;
   final void Function(BuildContext context, BoardTask task, Offset position)? onMenu;
+
+  /// Moves a dropped card. While an earlier move still saves, it waits for it.
   final void Function(String id, String status, int index) onMove;
 
   /// A card was picked up, or let go of.
@@ -64,12 +64,15 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
   Offset? _pointer;
   String? _dragging;
 
-  /// Where the pointer on a card went down, and whether it has since gone further than a touch
-  /// slop. A card let go of before that stays where it was.
-  Offset? _down;
-  bool _travelled = false;
+  /// Where each card being dragged was picked up, by task, and which of them have since been
+  /// carried further than a touch slop. A card let go of before that stays where it was.
+  ///
+  /// Kept by drag rather than by pointer, so that another finger on the board changes nothing.
+  final _liftedAt = <String, Offset>{};
+  final _carried = <String>{};
 
-  /// Whether the pointer on a card was lifted, rather than cancelled.
+  /// Whether the pointer last to leave a card was lifted, rather than cancelled. It is set as the
+  /// pointer leaves, just before the drag that pointer carried ends.
   bool _letGo = false;
 
   /// The pointers that drag a card as soon as they move. A finger or pen scrolls the board then, so
@@ -124,21 +127,29 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
     super.dispose();
   }
 
+  bool _wasCarried(String id) => _carried.contains(id);
+
   /// Picks [task] up from [child] with a pointer of [devices]: as soon as it moves, or once held
-  /// still for [delay].
+  /// still for [delay]. When the drag ends, [onEnd] learns where it began and whether the card was
+  /// carried away.
   Widget _draggable(
     BoardTask task,
     double width,
     Widget child, {
     required Set<PointerDeviceKind> devices,
     Duration? delay,
-    VoidCallback? onEnd,
+    void Function(Offset liftedAt, bool carried)? onEnd,
   }) => _CardDraggable(
     devices: devices,
     delay: delay,
     data: task.id,
-    maxSimultaneousDrags: widget.busy ? 0 : 1,
-    dragAnchorStrategy: pointerDragAnchorStrategy,
+    maxSimultaneousDrags: 1,
+    // The card hangs from the pointer, as with [pointerDragAnchorStrategy].
+    dragAnchorStrategy: (draggable, context, position) {
+      _liftedAt[task.id] = position;
+      _carried.remove(task.id);
+      return Offset.zero;
+    },
     feedbackOffset: const Offset(12, 12),
     feedback: Material(
       color: Colors.transparent,
@@ -149,9 +160,18 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
       ),
     ),
     onDragStarted: () => _start(task.id),
+    onDragUpdate: (details) {
+      _pointer = details.globalPosition;
+      final from = _liftedAt[task.id];
+      if (from != null && (details.globalPosition - from).distance > kTouchSlop) {
+        _carried.add(task.id);
+      }
+    },
     onDragEnd: (_) {
+      final liftedAt = _liftedAt.remove(task.id);
+      final carried = _carried.remove(task.id);
       _end();
-      onEnd?.call();
+      if (liftedAt != null) onEnd?.call(liftedAt, carried);
     },
     child: child,
   );
@@ -160,15 +180,8 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
   /// once they scroll the board. A long press let go of where it started opens the card's menu,
   /// as it does on a card that can't move.
   Widget _liftable(BoardTask task, double width, Widget card) => Listener(
-    onPointerDown: (event) {
-      _pointer = _down = event.position;
-      _travelled = _letGo = false;
-    },
-    onPointerMove: (event) {
-      _pointer = event.position;
-      if ((event.position - (_down ?? event.position)).distance > kTouchSlop) _travelled = true;
-    },
     onPointerUp: (_) => _letGo = true,
+    onPointerCancel: (_) => _letGo = false,
     child: _draggable(
       task,
       width,
@@ -179,9 +192,8 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
           width,
           devices: _fingers,
           delay: kLongPressTimeout,
-          onEnd: () {
-            final down = _down;
-            if (_letGo && !_travelled && down != null) widget.onMenu?.call(anchor, task, down);
+          onEnd: (liftedAt, carried) {
+            if (_letGo && !carried) widget.onMenu?.call(anchor, task, liftedAt);
           },
           card,
         ),
@@ -201,8 +213,7 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
         projectSlug: widget.board.slug,
         isFinal: column.isFinal == true,
         onMenu: widget.onMenu,
-        // While a move saves, nothing picks a card up, so a long press opens the menu at once.
-        lifts: widget.canMove && !widget.busy,
+        lifts: widget.canMove,
       ),
     );
     return widget.canMove ? _liftable(task, width, card) : card;
@@ -266,9 +277,8 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
     final key = _laneKeys.putIfAbsent(column.id, GlobalKey.new);
     return DragTarget<String>(
       key: ValueKey('drop-column-${column.slug}'),
-      onWillAcceptWithDetails: (_) => !widget.busy,
       onAcceptWithDetails: (details) {
-        if (_travelled) widget.onMove(details.data, column.slug, tasks.length);
+        if (_wasCarried(details.data)) widget.onMove(details.data, column.slug, tasks.length);
       },
       builder: (context, candidates, rejects) => DecoratedBox(
         decoration: BoxDecoration(
@@ -354,9 +364,8 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
                         )
                       : _CardTarget(
                           key: ValueKey('drop-card-${rows[index].task.id}'),
-                          enabled: !widget.busy,
                           onDrop: (id, after) {
-                            if (!_travelled) return;
+                            if (!_wasCarried(id)) return;
                             widget.onMove(
                               id,
                               column.slug,
@@ -386,8 +395,7 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
 }
 
 class _CardTarget extends StatefulWidget {
-  const _CardTarget({super.key, required this.enabled, required this.onDrop, required this.child});
-  final bool enabled;
+  const _CardTarget({super.key, required this.onDrop, required this.child});
   final void Function(String id, bool after) onDrop;
   final Widget child;
   @override
@@ -403,7 +411,6 @@ class _CardTargetState extends State<_CardTarget> {
 
   @override
   Widget build(BuildContext context) => DragTarget<String>(
-    onWillAcceptWithDetails: (_) => widget.enabled,
     onMove: (details) {
       final after = _isAfter(details.offset);
       if (_after != after) setState(() => _after = after);
@@ -441,6 +448,7 @@ class _CardDraggable extends Draggable<String> {
     super.dragAnchorStrategy,
     super.feedbackOffset,
     super.onDragStarted,
+    super.onDragUpdate,
     super.onDragEnd,
   });
 

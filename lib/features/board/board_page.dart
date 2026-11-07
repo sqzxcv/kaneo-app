@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -29,6 +31,9 @@ class _BoardPageState extends ConsumerState<BoardPage> {
   bool _showPlanned = false;
   bool _showArchived = false;
   bool _moving = false;
+
+  /// The move or card edit being saved. A card dropped meanwhile waits for it, then moves.
+  Future<void>? _saving;
   bool _menuOpen = false;
   final _refreshKey = GlobalKey<RefreshIndicatorState>();
 
@@ -63,8 +68,25 @@ class _BoardPageState extends ConsumerState<BoardPage> {
     _move(id, status, unfilteredDropIndex(full, shown, index));
   }
 
+  /// Marks a move or card edit as saving, until the returned completer completes.
+  Completer<void> _startSaving() {
+    final saving = Completer<void>();
+    _saving = saving.future;
+    setState(() => _moving = true);
+    return saving;
+  }
+
+  void _endSaving(Completer<void> saving) {
+    _saving = null;
+    saving.complete();
+    if (mounted) setState(() => _moving = false);
+  }
+
   Future<void> _move(String id, String status, int index) async {
-    if (_moving) return;
+    while (_saving != null) {
+      await _saving;
+    }
+    if (!mounted) return;
     final query = boardQuery(widget.projectId);
     final board = ref.read(query).value;
     if (board == null) return;
@@ -73,7 +95,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
     final subscription = ProviderScope.containerOf(context, listen: false).listen(query, (_, _) {});
     final notifier = ref.read(query.notifier);
     final api = ref.read(kaneoApiProvider);
-    setState(() => _moving = true);
+    final saving = _startSaving();
     notifier.setData(collapseBoardCollections(move.after));
     final ok = await runAction(context, () async {
       await api.reorderTasks(widget.projectId, move.updates);
@@ -87,7 +109,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
       );
     }
     subscription.close();
-    if (mounted) setState(() => _moving = false);
+    _endSaving(saving);
   }
 
   Future<void> _editCard(
@@ -104,7 +126,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
     final subscription = ProviderScope.containerOf(context, listen: false).listen(query, (_, _) {});
     final notifier = ref.read(query.notifier);
     final api = ref.read(kaneoApiProvider);
-    setState(() => _moving = true);
+    final saving = _startSaving();
     notifier.setData(updateBoardTask(board, id, update));
     final saved = await runAction(context, () => save(api));
     if (saved == null) {
@@ -113,7 +135,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
       );
     }
     subscription.close();
-    if (mounted) setState(() => _moving = false);
+    _endSaving(saving);
   }
 
   /// What the signed-in member may do on [board], or null until it has loaded. Until then
@@ -336,7 +358,6 @@ class _BoardPageState extends ConsumerState<BoardPage> {
                       sourceBoard: board,
                       key: ValueKey(widget.projectId),
                       board: _visible(board),
-                      busy: _moving,
                       canCreate: canCreate,
                       canMove: can?.updateTasks != false,
                       onMove: _moveVisible,

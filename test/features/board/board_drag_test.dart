@@ -265,21 +265,81 @@ void main() {
     expect(statusOf(server, 'task-1'), 'to-do');
   });
 
-  onIOS('while a move saves, a long press opens the menu at once', (tester, size) async {
-    final server = FakeKaneo();
+  // A move takes a moment to save on a distant server. A long press on the next card used to open
+  // its menu meanwhile, and a card dropped meanwhile went back where it was.
+  onIOS('while a move saves, a finger picks the next card up, and its drop lands after', (
+    tester,
+    size,
+  ) async {
+    final server = FakeKaneo()..relations.clear();
     final app = await pumpBoard(tester, server, size);
     final gate = server.hold('api/task/reorder');
-    final drag = await pickUpCard(tester, 'task-1');
-    await goTo(tester, drag, inProgress(tester));
-    await drag.up();
+    final first = await pickUpCard(tester, 'task-1');
+    await goTo(tester, first, inProgress(tester));
+    await first.up();
     await tester.pump();
-    final press = await tester.startGesture(cardBody(tester, 'task-2'));
+    final second = await tester.startGesture(cardBody(tester, 'task-2'));
     await tester.pump(held);
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text(app.i18n.t('mobile:board.moveTo')), findsOneWidget);
-    await press.up();
+    expect(find.text(app.i18n.t('mobile:board.moveTo')), findsNothing);
+    await goTo(tester, second, inProgress(tester));
+    await second.up();
+    await tester.pump();
+    expect(find.text(app.i18n.t('mobile:board.moveTo')), findsNothing);
     gate.release();
     await tester.pumpAndSettle();
     expect(statusOf(server, 'task-1'), 'in-progress');
+    expect(statusOf(server, 'task-2'), 'in-progress');
+    expect(find.descendant(of: column('in-progress'), matching: card('task-2')), findsOneWidget);
   });
+
+  // A palm or another finger on the board used to stand in for the finger carrying the card.
+  onIOS('another finger on the board neither undoes a drag nor opens the menu', (
+    tester,
+    size,
+  ) async {
+    final server = FakeKaneo();
+    final app = await pumpBoard(tester, server, size);
+    final carrying = await tester.startGesture(cardBody(tester, 'task-1'));
+    await tester.pump(held);
+    await goTo(tester, carrying, inProgress(tester));
+    final other = await tester.startGesture(cardBody(tester, 'task-3'), pointer: 7);
+    await tester.pump(const Duration(milliseconds: 50));
+    await carrying.up();
+    await other.up();
+    await tester.pumpAndSettle();
+    expect(statusOf(server, 'task-1'), 'in-progress');
+    expect(find.text(app.i18n.t('mobile:board.moveTo')), findsNothing);
+  });
+
+  onIOS('a card carried away and brought back is put down without the menu', (tester, size) async {
+    final server = FakeKaneo();
+    final app = await pumpBoard(tester, server, size);
+    final start = cardBody(tester, 'task-1');
+    final gesture = await tester.startGesture(start);
+    await tester.pump(held);
+    await goTo(tester, gesture, start + const Offset(0, 120));
+    await goTo(tester, gesture, start);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text(app.i18n.t('mobile:board.moveTo')), findsNothing);
+    expect(server.requestsTo('api/task/reorder'), isEmpty);
+  });
+
+  // Tooltips answer a long press too, and used to take it from the card.
+  for (final (part, finder) in [
+    ('assignee', find.descendant(of: card('task-1'), matching: find.byType(CircleAvatar))),
+    ('expand arrow', find.byKey(const ValueKey('expand-task-task-1'))),
+  ]) {
+    onIOS('a long press on the $part picks the card up as well', (tester, size) async {
+      final server = FakeKaneo();
+      await pumpBoard(tester, server, size);
+      final gesture = await tester.startGesture(tester.getCenter(finder));
+      await tester.pump(held);
+      await goTo(tester, gesture, inProgress(tester));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(statusOf(server, 'task-1'), 'in-progress');
+      expect(find.byType(Tooltip), findsWidgets);
+    });
+  }
 }
