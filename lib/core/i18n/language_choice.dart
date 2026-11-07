@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers.dart';
 import 'resolve_locale.dart';
 
-const _languageKey = 'kaneo.language';
+/// Where the choice is kept, for code that runs without the providers.
+const languageChoiceKey = 'kaneo.language';
 
 /// The value of [languageChoiceProvider] that means "follow the device".
 const String systemLanguage = 'system';
@@ -14,12 +15,12 @@ final languageChoiceProvider = NotifierProvider<LanguageChoice, String>(Language
 
 class LanguageChoice extends Notifier<String> {
   @override
-  String build() => ref.watch(prefsProvider).getString(_languageKey) ?? systemLanguage;
+  String build() => ref.watch(prefsProvider).getString(languageChoiceKey) ?? systemLanguage;
 
   Future<void> select(String? choice) async {
     final value = choice ?? systemLanguage;
     state = value;
-    await ref.read(prefsProvider).setString(_languageKey, value);
+    await ref.read(prefsProvider).setString(languageChoiceKey, value);
     await ref.read(i18nProvider).setLocale(activeLocale(value));
   }
 }

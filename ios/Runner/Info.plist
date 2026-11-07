@@ -10,6 +10,15 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connect to the self-hosted Kaneo server you choose on your local network.</string>
+	<!-- The background check for notifications. Keep in step with AppDelegate.swift. -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>app.kaneo.kaneoApp.notificationCheck</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

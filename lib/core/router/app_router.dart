@@ -9,6 +9,7 @@ import '../../features/board/board_page.dart';
 import '../../features/home/home_page.dart';
 import '../../features/inbox/inbox_page.dart';
 import '../../features/inbox/my_tasks_page.dart';
+import '../../features/notifications/notification_runtime.dart';
 import '../../features/search/search_page.dart';
 import '../../features/shell/account_page.dart';
 import '../../features/shell/app_shell.dart';
@@ -89,6 +90,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
   ref.watch(desktopRuntimeProvider(router));
+  ref.watch(notificationRuntimeProvider(router));
   ref.onDispose(router.dispose);
   return router;
 });

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/core.dart';
+import '../notifications/notification_runtime.dart';
 
 /// A dropdown's width. Fixed, so that a long option never pushes out the row's title on the
 /// narrowest page, which is what a wide window leaves next to the sidebar.
@@ -12,7 +13,8 @@ DropdownMenuItem<T> _option<T>(T value, String label) => DropdownMenuItem(
   child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
 );
 
-/// The account, language, theme and signing out. Everything else about the account is in KAN-16.
+/// The account, language, theme, notifications and signing out. Everything else about the account
+/// is in KAN-16.
 class AccountPage extends ConsumerWidget {
   const AccountPage({super.key});
 
@@ -68,6 +70,7 @@ class AccountPage extends ConsumerWidget {
                 ),
               ),
             ),
+            const _NotificationSwitch(),
             const SizedBox(height: 16),
             Align(
               alignment: AlignmentDirectional.centerStart,
@@ -89,5 +92,50 @@ class AccountPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// Turns notifications on and off. The desktop apps check while they run instead of about every 15
+/// minutes, so they leave out the part that says so.
+class _NotificationSwitch extends ConsumerWidget {
+  const _NotificationSwitch();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final desktop = ref.watch(isDesktopProvider);
+    return SwitchListTile(
+      key: const ValueKey('notification-checks'),
+      contentPadding: EdgeInsets.zero,
+      title: Text(
+        context.t(
+          desktop ? 'mobile:account.notifications.title' : 'mobile:account.notifications.phone',
+        ),
+      ),
+      subtitle: desktop ? null : Text(context.t('mobile:account.notifications.phoneHint')),
+      value: ref.watch(notificationChecksEnabledProvider),
+      onChanged: (enabled) => _change(context, ref, enabled),
+    );
+  }
+
+  Future<void> _change(BuildContext context, WidgetRef ref, bool enabled) async {
+    if (enabled && !await _allowed(ref)) {
+      if (context.mounted) {
+        showToast(
+          context,
+          context.t('mobile:account.notifications.permissionDenied'),
+          kind: ToastKind.error,
+        );
+      }
+      return;
+    }
+    await ref.read(notificationChecksEnabledProvider.notifier).setEnabled(enabled);
+  }
+
+  Future<bool> _allowed(WidgetRef ref) async {
+    try {
+      return await ref.read(notificationPermissionProvider)();
+    } on Exception {
+      return false;
+    }
   }
 }

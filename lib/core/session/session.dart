@@ -61,7 +61,10 @@ class SecureSessionStorage implements SessionStorage {
     : _storage = Platform.isMacOS
           // The data protection keychain needs a provisioning profile, which local builds lack.
           ? const FlutterSecureStorage(mOptions: MacOsOptions(usesDataProtectionKeychain: false))
-          : const FlutterSecureStorage();
+          : const FlutterSecureStorage(iOptions: iOSOptions);
+
+  /// The background check for notifications reads the session while the phone is locked.
+  static const iOSOptions = IOSOptions(accessibility: KeychainAccessibility.first_unlock);
 
   /// An optional namespace lets integration tests avoid any existing app session.
   final String key;
