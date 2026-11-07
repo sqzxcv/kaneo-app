@@ -711,10 +711,28 @@ class FakeKaneo implements HttpClientAdapter {
     };
   }
 
+  Map<String, dynamic>? _projectOfTask(Map<String, dynamic> task) =>
+      projects.where((p) => p['id'] == task['projectId']).firstOrNull;
+
+  /// Whether the inbox of [workspaceId] lists [notification]. Like the server, this goes by where
+  /// its task or workspace is now. Ones that point to nothing here show in every workspace, which
+  /// keeps tests with made-up resources simple.
+  bool _notificationIn(Map<String, dynamic> notification, String workspaceId) {
+    final resource = notification['resourceId'];
+    if (resource == null) return true;
+    if (notification['resourceType'] == 'workspace') return resource == workspaceId;
+    final task = tasks.where((t) => t['id'] == resource).firstOrNull;
+    final project = task == null ? null : _projectOfTask(task);
+    return project == null || project['workspaceId'] == workspaceId;
+  }
+
   Map<String, dynamic> _assigned(FakeRequest request) {
+    final workspace = request.query['workspaceId'];
     final mine = [
       for (final task in tasks)
-        if (task['userId'] == userId) task,
+        if (task['userId'] == userId &&
+            (workspace == null || _projectOfTask(task)?['workspaceId'] == workspace))
+          task,
     ];
     return {
       'tasks': [
@@ -1396,7 +1414,13 @@ class FakeKaneo implements HttpClientAdapter {
     });
 
     // Notifications
-    _route('GET', 'api/notification', (request, params) => notifications);
+    _route('GET', 'api/notification', (request, params) {
+      final workspace = request.query['workspaceId'];
+      return [
+        for (final notification in notifications)
+          if (workspace == null || _notificationIn(notification, workspace)) notification,
+      ];
+    });
     _route('PATCH', 'api/notification/read-all', (request, params) {
       for (final notification in notifications) {
         notification['isRead'] = true;

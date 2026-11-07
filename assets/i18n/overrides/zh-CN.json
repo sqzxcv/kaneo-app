@@ -1,5 +1,8 @@
 {
 	"app": {
+		"home": {
+			"noWorkspaceOnWeb": "请到网页端创建工作区或接受邀请，然后回到这里。"
+		},
 		"shell": {
 			"noProjects": "暂无项目",
 			"projectsUnavailable": "项目加载失败",

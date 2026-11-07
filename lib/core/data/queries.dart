@@ -69,6 +69,16 @@ final projectsQuery = cachedQueryFamily<List<Project>, String>(
   ),
 );
 
+/// [projectsQuery] with the archived projects as well.
+final allProjectsQuery = cachedQueryFamily<List<Project>, String>(
+  (workspaceId) => QuerySpec(
+    key: 'projects-all/$workspaceId',
+    fetch: (ref) => ref.read(kaneoApiProvider).projects(workspaceId, includeArchived: true),
+    encode: (v) => v.map((e) => e.toJson()).toList(),
+    decode: (j) => _decodeList(j, Project.fromJson),
+  ),
+);
+
 /// Every page of a board, merged.
 final boardQuery = cachedQueryFamily<BoardData, String>(
   (projectId) => QuerySpec(

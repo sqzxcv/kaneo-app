@@ -102,6 +102,36 @@ void main() {
       expect(greeting(i18n, DateTime(2026, 3, 9, 13)), i18n.t('mobile:time.goodAfternoon'));
       expect(greeting(i18n, DateTime(2026, 3, 9, 20)), i18n.t('mobile:time.goodEvening'));
     });
+
+    test('the greeting changes exactly at the hours it is told', () {
+      expect(greeting(i18n, DateTime(2026, 3, 9, 4, 59)), i18n.t('mobile:time.goodEvening'));
+      expect(greeting(i18n, DateTime(2026, 3, 9, 5)), i18n.t('mobile:time.goodMorning'));
+      expect(greeting(i18n, DateTime(2026, 3, 9, 11, 59)), i18n.t('mobile:time.goodMorning'));
+      expect(greeting(i18n, DateTime(2026, 3, 9, 12)), i18n.t('mobile:time.goodAfternoon'));
+      expect(greeting(i18n, DateTime(2026, 3, 9, 17, 59)), i18n.t('mobile:time.goodAfternoon'));
+      expect(greeting(i18n, DateTime(2026, 3, 9, 18)), i18n.t('mobile:time.goodEvening'));
+    });
+
+    group('nextGreetingOrDayChange', () {
+      test('is the next greeting of the day', () {
+        expect(nextGreetingOrDayChange(DateTime(2026, 3, 9)), DateTime(2026, 3, 9, 5));
+        expect(nextGreetingOrDayChange(DateTime(2026, 3, 9, 4, 59, 59)), DateTime(2026, 3, 9, 5));
+        expect(nextGreetingOrDayChange(DateTime(2026, 3, 9, 11)), DateTime(2026, 3, 9, 12));
+        expect(nextGreetingOrDayChange(DateTime(2026, 3, 9, 17)), DateTime(2026, 3, 9, 18));
+      });
+
+      test('is always later than now, even exactly at a change', () {
+        expect(nextGreetingOrDayChange(DateTime(2026, 3, 9, 5)), DateTime(2026, 3, 9, 12));
+        expect(nextGreetingOrDayChange(DateTime(2026, 3, 9, 12)), DateTime(2026, 3, 9, 18));
+        expect(nextGreetingOrDayChange(DateTime(2026, 3, 9, 18)), DateTime(2026, 3, 10));
+      });
+
+      test('is midnight in the evening, across months and years', () {
+        expect(nextGreetingOrDayChange(DateTime(2026, 3, 9, 23, 59)), DateTime(2026, 3, 10));
+        expect(nextGreetingOrDayChange(DateTime(2026, 2, 28, 20)), DateTime(2026, 3, 1));
+        expect(nextGreetingOrDayChange(DateTime(2026, 12, 31, 20)), DateTime(2027, 1, 1));
+      });
+    });
   });
 
   group('style helpers', () {

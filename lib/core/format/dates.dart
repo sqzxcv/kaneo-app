@@ -101,11 +101,24 @@ String relativeLong(I18n i18n, String? value, {DateTime? now}) {
   return formatDay(i18n, date, now: current);
 }
 
+const int _morningStart = 5;
+const int _afternoonStart = 12;
+const int _eveningStart = 18;
+
 /// The greeting for the time of day.
 String greeting(I18n i18n, DateTime date) {
   final hour = date.hour;
-  if (hour < 5) return i18n.t('mobile:time.goodEvening');
-  if (hour < 12) return i18n.t('mobile:time.goodMorning');
-  if (hour < 18) return i18n.t('mobile:time.goodAfternoon');
+  if (hour < _morningStart) return i18n.t('mobile:time.goodEvening');
+  if (hour < _afternoonStart) return i18n.t('mobile:time.goodMorning');
+  if (hour < _eveningStart) return i18n.t('mobile:time.goodAfternoon');
   return i18n.t('mobile:time.goodEvening');
+}
+
+/// The next moment after [now] at which [greeting] or the calendar day changes.
+DateTime nextGreetingOrDayChange(DateTime now) {
+  for (final hour in const [_morningStart, _afternoonStart, _eveningStart]) {
+    final change = DateTime(now.year, now.month, now.day, hour);
+    if (change.isAfter(now)) return change;
+  }
+  return DateTime(now.year, now.month, now.day + 1);
 }

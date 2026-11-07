@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/core.dart';
+import 'workspace_switch.dart';
 
 /// The web app's sidebar width.
 const double sidebarWidth = 256;
@@ -94,25 +95,6 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
 class _WorkspaceHeader extends ConsumerWidget {
   const _WorkspaceHeader();
 
-  Future<void> _switch(BuildContext context, WidgetRef ref, Workspace current) async {
-    // Taken up front: the window can turn narrow, and take the sidebar away, while this is open.
-    final selection = ref.read(selectedWorkspaceIdProvider.notifier);
-    final router = GoRouter.of(context);
-    final picked = await pickOption<String>(
-      context,
-      title: context.t('navigation:workspaceSwitcher.workspaces'),
-      selected: current.id,
-      options: [
-        for (final workspace in ref.read(workspacesQuery).value ?? const <Workspace>[])
-          PickerOption(value: workspace.id, label: workspace.name),
-      ],
-    );
-    if (picked == null || picked.value == current.id) return;
-    await selection.select(picked.value);
-    // The open page may belong to the workspace just left.
-    router.go(AppRoutes.home);
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final value = ref.watch(currentWorkspaceProvider);
@@ -125,7 +107,7 @@ class _WorkspaceHeader extends ConsumerWidget {
           label: current.name,
           strong: true,
           trailing: Icon(LucideIcons.chevronDown, size: 14, color: context.colors.foreground),
-          onTap: () => _switch(context, ref, current),
+          onTap: () => switchWorkspace(context, ref, current),
         ),
       );
     } else if (value.hasError && !value.hasValue) {

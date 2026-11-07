@@ -12,16 +12,19 @@ const double contentMaxWidth = 768;
 /// The widgets are the same in both layouts, so whatever [child] holds survives crossing the
 /// breakpoint. Do not branch on `context.isWide` around stateful content for the same reason.
 class ContentWidth extends StatelessWidget {
-  const ContentWidth({super.key, required this.child});
+  const ContentWidth({super.key, required this.child, this.maxWidth = contentMaxWidth});
 
   final Widget child;
+
+  /// How wide [child] grows on wide windows.
+  final double maxWidth;
 
   @override
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: context.isWide ? contentMaxWidth : double.infinity),
+        constraints: BoxConstraints(maxWidth: context.isWide ? maxWidth : double.infinity),
         child: SizedBox(width: double.infinity, child: child),
       ),
     );

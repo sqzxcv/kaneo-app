@@ -29,6 +29,43 @@ void main() {
     api = KaneoApi(client, i18n);
   });
 
+  group('a second workspace', () {
+    const other = 'other-workspace';
+
+    setUp(() {
+      server.workspaces.add({...server.workspaces.first, 'id': other, 'name': 'Other'});
+      server.addProject(id: 'other-project', name: 'Other', slug: 'OTH')['workspaceId'] = other;
+      final task = server.addTask(projectId: 'other-project', title: 'Theirs');
+      server.addNotification(title: 'About theirs', resourceId: task['id'] as String);
+      server.addNotification(
+        type: 'workspace_created',
+        title: 'Made',
+        resourceId: other,
+        resourceType: 'workspace',
+      );
+    });
+
+    test('has its own assigned tasks, as on the real server', () async {
+      final theirs = await api.assignedTasks(other);
+      expect(theirs.tasks.map((t) => t.title), ['Theirs']);
+      expect(theirs.total, 1);
+      final ours = await api.assignedTasks(FakeKaneo.workspaceId);
+      expect(ours.tasks.map((t) => t.title), isNot(contains('Theirs')));
+      expect(ours.tasks, isNotEmpty);
+    });
+
+    test('has its own inbox, as on the real server', () async {
+      final theirs = await api.notifications(workspaceId: other);
+      expect(theirs.map((n) => n.title), ['About theirs', 'Made']);
+      final ours = await api.notifications(workspaceId: FakeKaneo.workspaceId);
+      expect(ours.map((n) => n.title), isNot(contains('About theirs')));
+      expect(ours.map((n) => n.title), isNot(contains('Made')));
+      expect(ours, isNotEmpty);
+      final everything = await api.notifications();
+      expect(everything.length, theirs.length + ours.length);
+    });
+  });
+
   test('wrong credentials get 401, the way the real server answers', () async {
     token = 'wrong';
     await expectLater(

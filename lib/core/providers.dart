@@ -15,6 +15,9 @@ import 'i18n/i18n.dart';
 import 'session/session.dart';
 import 'ui/toast.dart';
 
+/// The current time. Tests replace it to move past midnight.
+final nowProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
 /// Set by `bootstrap()`, or by the test harness.
 final prefsProvider = Provider<SharedPreferences>((ref) => throw UnimplementedError());
 

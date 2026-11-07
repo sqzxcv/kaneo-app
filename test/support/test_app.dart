@@ -98,7 +98,7 @@ class TestApp {
 ///
 /// Starts signed in on [location]. Pass `session: null` to start signed out. Waits for the first
 /// page to finish loading; pass `settle: false` to look at it while a request is held with
-/// `server.hold(...)`.
+/// `server.hold(...)`. [overrides] replaces providers on top of the test setup, such as the clock.
 Future<TestApp> pumpKaneoApp(
   WidgetTester tester, {
   FakeKaneo? server,
@@ -109,12 +109,13 @@ Future<TestApp> pumpKaneoApp(
   String locale = defaultLocale,
   DevConfig devConfig = const DevConfig(),
   Map<String, Object> preferences = const {},
+  List<Override> overrides = const [],
   bool settle = true,
 }) async {
   setWindowSize(tester, size);
   final fake = server ?? FakeKaneo();
   final i18n = await loadTestI18n(tester, locale: locale);
-  final overrides = await _overrides(
+  final base = await _overrides(
     i18n,
     fake,
     session: session,
@@ -123,7 +124,10 @@ Future<TestApp> pumpKaneoApp(
     devConfig: devConfig,
     preferences: preferences,
   );
-  final container = ProviderContainer(retry: (count, error) => null, overrides: overrides);
+  final container = ProviderContainer(
+    retry: (count, error) => null,
+    overrides: [...base, ...overrides],
+  );
   addTearDown(container.dispose);
   await tester.pumpWidget(UncontrolledProviderScope(container: container, child: const KaneoApp()));
   if (settle) await tester.pumpAndSettle();

@@ -1,5 +1,8 @@
 {
 	"app": {
+		"home": {
+			"noWorkspaceOnWeb": "Create a workspace or accept an invitation in the Kaneo web app, then come back here."
+		},
 		"shell": {
 			"noProjects": "No projects",
 			"projectsUnavailable": "Couldn't load projects",
