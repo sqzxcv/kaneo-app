@@ -27,28 +27,30 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   Widget build(BuildContext context) {
     return PlaceholderPage(
       title: context.t('mobile:ui.search'),
-      child: WorkspaceGate(
-        builder: (context, workspace) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                key: const ValueKey('search-field'),
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(hintText: context.t('mobile:ui.search')),
-                onSubmitted: (query) => _search(query, workspace.id),
+      child: ContentWidth(
+        child: WorkspaceGate(
+          builder: (context, workspace) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  key: const ValueKey('search-field'),
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(hintText: context.t('mobile:ui.search')),
+                  onSubmitted: (query) => _search(query, workspace.id),
+                ),
               ),
-            ),
-            Expanded(
-              child: ListView(
-                children: [
-                  for (final result in _results ?? const <SearchResult>[])
-                    ListTile(title: Text(result.title), subtitle: Text(result.type)),
-                ],
+              Expanded(
+                child: ListView(
+                  children: [
+                    for (final result in _results ?? const <SearchResult>[])
+                      ListTile(title: Text(result.title), subtitle: Text(result.type)),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -1,5 +1,10 @@
 {
 	"app": {
+		"shell": {
+			"noProjects": "No projects",
+			"projectsUnavailable": "Couldn't load projects",
+			"workspaceUnavailable": "Couldn't load workspaces"
+		},
 		"errors": {
 			"badResponse": "The server sent a response this app can't read."
 		},

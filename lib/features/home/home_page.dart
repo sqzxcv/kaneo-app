@@ -14,13 +14,21 @@ class HomePage extends ConsumerWidget {
     final workspace = ref.watch(currentWorkspaceProvider);
     return PlaceholderPage(
       title: context.t('mobile:nav.home'),
-      actions: [
-        IconButton(
-          tooltip: context.t('mobile:home.search'),
-          icon: const Icon(LucideIcons.search),
-          onPressed: () => context.push(AppRoutes.search),
-        ),
-      ],
+      // Wide windows have these in the sidebar.
+      actions: context.isWide
+          ? null
+          : [
+              IconButton(
+                tooltip: context.t('mobile:home.search'),
+                icon: const Icon(LucideIcons.search),
+                onPressed: () => context.push(AppRoutes.search),
+              ),
+              IconButton(
+                tooltip: context.t('mobile:home.account'),
+                icon: const Icon(LucideIcons.user),
+                onPressed: () => context.push(AppRoutes.account),
+              ),
+            ],
       child: AsyncBody(
         value: workspace,
         onRetry: () => ref.read(workspacesQuery.notifier).refresh(),

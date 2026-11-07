@@ -12,26 +12,28 @@ class InboxPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return PlaceholderPage(
       title: context.t('mobile:nav.inbox'),
-      child: WorkspaceGate(
-        builder: (context, workspace) {
-          final query = notificationsQuery(workspace.id);
-          return AsyncBody(
-            value: ref.watch(query),
-            onRetry: () => ref.read(query.notifier).refresh(),
-            isEmpty: (items) => items.isEmpty,
-            empty: StatusMessage(title: context.t('mobile:inbox.empty.title')),
-            builder: (context, items) => ListView(
-              children: [
-                ListTile(title: Text(context.t('app:list.count', {'count': items.length}))),
-                for (final item in items)
-                  ListTile(
-                    title: Text(item.title ?? item.type),
-                    subtitle: Text(item.content ?? ''),
-                  ),
-              ],
-            ),
-          );
-        },
+      child: ContentWidth(
+        child: WorkspaceGate(
+          builder: (context, workspace) {
+            final query = notificationsQuery(workspace.id);
+            return AsyncBody(
+              value: ref.watch(query),
+              onRetry: () => ref.read(query.notifier).refresh(),
+              isEmpty: (items) => items.isEmpty,
+              empty: StatusMessage(title: context.t('mobile:inbox.empty.title')),
+              builder: (context, items) => ListView(
+                children: [
+                  ListTile(title: Text(context.t('app:list.count', {'count': items.length}))),
+                  for (final item in items)
+                    ListTile(
+                      title: Text(item.title ?? item.type),
+                      subtitle: Text(item.content ?? ''),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

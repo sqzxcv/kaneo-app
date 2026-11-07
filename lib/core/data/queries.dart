@@ -46,14 +46,18 @@ class SelectedWorkspaceId extends Notifier<String?> {
 }
 
 /// The remembered workspace if it still exists, otherwise the first one, or null if there are none.
+///
+/// Stays on the data it has while the list refreshes or fails to, like every cached query. Pages are
+/// built under this, so losing it for a moment would throw away whatever they hold.
 final currentWorkspaceProvider = Provider.autoDispose<AsyncValue<Workspace?>>((ref) {
   final selected = ref.watch(selectedWorkspaceIdProvider);
-  return ref.watch(workspacesQuery).whenData((list) {
-    for (final workspace in list) {
-      if (workspace.id == selected) return workspace;
-    }
-    return list.firstOrNull;
-  });
+  final workspaces = ref.watch(workspacesQuery);
+  if (!workspaces.hasValue) return workspaces.whenData((_) => null);
+  final list = workspaces.requireValue;
+  for (final workspace in list) {
+    if (workspace.id == selected) return AsyncData(workspace);
+  }
+  return AsyncData(list.firstOrNull);
 });
 
 final projectsQuery = cachedQueryFamily<List<Project>, String>(

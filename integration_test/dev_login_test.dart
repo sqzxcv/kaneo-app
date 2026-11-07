@@ -51,7 +51,8 @@ void main() {
 
     final projects = await api.projects(config.workspaceId);
     expect(projects.map((p) => p.name), containsAll(['Demo', 'Second project']));
-    expect(find.text('Second project'), findsOneWidget);
+    // Once on the page, and once more in the sidebar on wide windows.
+    expect(find.text('Second project'), findsWidgets);
 
     final router = container.read(routerProvider);
     final notice = find.text(container.read(i18nProvider).t('app:placeholder.notice'));
@@ -133,7 +134,8 @@ void main() {
             userEmail: session.userEmail,
           ),
         );
-    router.go(AppRoutes.home);
+    // The home page stays open under the others, so it is the inbox that sends the next request.
+    router.go(AppRoutes.inbox);
     await waitFor(tester, find.byType(LoginPage));
     expect(container.read(sessionProvider), isNull);
   });

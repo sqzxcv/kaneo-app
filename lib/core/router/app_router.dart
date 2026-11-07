@@ -29,6 +29,9 @@ String? authRedirect({required bool signedIn, required Uri location}) {
   return null;
 }
 
+/// The path of a route nested under the home page, which go_router wants without the leading `/`.
+String _below(String path) => path.substring(1);
+
 final routerProvider = Provider<GoRouter>((ref) {
   final sessionChanged = ValueNotifier<int>(0);
   ref.listen(sessionProvider, (_, _) => sessionChanged.value++);
@@ -44,28 +47,42 @@ final routerProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (context, state, child) => AppShell(location: state.uri, child: child),
         routes: [
-          GoRoute(path: AppRoutes.home, builder: (context, state) => const HomePage()),
+          GoRoute(
+            path: AppRoutes.home,
+            builder: (context, state) => const HomePage(),
+            // Below the home page, so that these always have a way back. A page opened from the
+            // sidebar would otherwise be stuck when the window turns narrow: it has no tabs there.
+            routes: [
+              GoRoute(
+                path: _below(AppRoutes.search),
+                builder: (context, state) => const SearchPage(),
+              ),
+              GoRoute(
+                path: _below(AppRoutes.account),
+                builder: (context, state) => const AccountPage(),
+              ),
+              GoRoute(
+                path: _below(AppRoutes.boardPattern),
+                builder: (context, state) =>
+                    BoardPage(projectId: state.pathParameters['projectId']!),
+              ),
+              // Registered before the task page so `new` is not read as a task id.
+              GoRoute(
+                path: _below(AppRoutes.newTaskPath),
+                builder: (context, state) => NewTaskPage(
+                  projectId: state.uri.queryParameters['projectId'],
+                  status: state.uri.queryParameters['status'],
+                ),
+              ),
+              GoRoute(
+                path: _below(AppRoutes.taskPattern),
+                builder: (context, state) => TaskPage(taskId: state.pathParameters['taskId']!),
+              ),
+            ],
+          ),
           GoRoute(path: AppRoutes.inbox, builder: (context, state) => const InboxPage()),
           GoRoute(path: AppRoutes.myTasks, builder: (context, state) => const MyTasksPage()),
           GoRoute(path: AppRoutes.activity, builder: (context, state) => const ActivityPage()),
-          GoRoute(path: AppRoutes.search, builder: (context, state) => const SearchPage()),
-          GoRoute(path: AppRoutes.account, builder: (context, state) => const AccountPage()),
-          GoRoute(
-            path: AppRoutes.boardPattern,
-            builder: (context, state) => BoardPage(projectId: state.pathParameters['projectId']!),
-          ),
-          // Registered before the task page so `new` is not read as a task id.
-          GoRoute(
-            path: AppRoutes.newTaskPath,
-            builder: (context, state) => NewTaskPage(
-              projectId: state.uri.queryParameters['projectId'],
-              status: state.uri.queryParameters['status'],
-            ),
-          ),
-          GoRoute(
-            path: AppRoutes.taskPattern,
-            builder: (context, state) => TaskPage(taskId: state.pathParameters['taskId']!),
-          ),
         ],
       ),
     ],

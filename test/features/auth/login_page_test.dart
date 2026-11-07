@@ -67,7 +67,7 @@ void main() {
     await passwordForm(tester);
     await submit(tester);
     expect(find.byType(LoginPage), findsNothing);
-    expect(find.text('Demo'), findsOneWidget);
+    expect(inPage(find.text('Demo')), findsOneWidget);
     expect((await storage.read())?.credentialType, CredentialType.bearer);
     expect(
       app.server.requestsTo('api/user/me').last.headers['Authorization'],
@@ -180,7 +180,7 @@ void main() {
       sessionStorage: storage,
     );
     expect(find.byType(LoginPage), findsNothing);
-    expect(find.text('Demo'), findsOneWidget);
+    expect(inPage(find.text('Demo')), findsOneWidget);
     expect(app.server.requestsTo('api/auth/sign-in/email'), isEmpty);
   });
 
@@ -194,7 +194,7 @@ void main() {
     await store.write('notifications/${FakeKaneo.workspaceId}', [
       {'id': 'old-notification'},
     ]);
-    expect(find.text('Demo'), findsOneWidget);
+    expect(inPage(find.text('Demo')), findsOneWidget);
     app.container.read(routerProvider).go(AppRoutes.account);
     await tester.pumpAndSettle();
     await tester.tap(find.text(app.i18n.t('mobile:account.signOut.button')));

@@ -151,7 +151,7 @@ void main() {
       await tester.tap(find.byIcon(LucideIcons.chevronLeft));
       await tester.pumpAndSettle();
     }
-    await tester.tap(find.text('Demo'));
+    await tester.tap(inPage(find.text('Demo')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Second project').last);
     await tester.pumpAndSettle();

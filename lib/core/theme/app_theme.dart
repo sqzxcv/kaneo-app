@@ -183,10 +183,26 @@ ThemeData _theme(Brightness brightness, KaneoColors c) {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: radius, side: border),
     ),
+    // The current app's slim bar: the active tab is ink, the rest gray, with no pill behind it.
     navigationBarTheme: NavigationBarThemeData(
+      height: 60,
       backgroundColor: c.background,
       surfaceTintColor: const Color(0x00000000),
-      indicatorColor: c.accent,
+      indicatorColor: const Color(0x00000000),
+      iconTheme: WidgetStateProperty.resolveWith(
+        (states) => IconThemeData(
+          size: 22,
+          color: states.contains(WidgetState.selected) ? c.foreground : c.mutedForeground,
+        ),
+      ),
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (states) => TextStyle(
+          fontFamily: KaneoFonts.sans,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: states.contains(WidgetState.selected) ? c.foreground : c.mutedForeground,
+        ),
+      ),
     ),
     navigationRailTheme: NavigationRailThemeData(
       backgroundColor: c.sidebar,

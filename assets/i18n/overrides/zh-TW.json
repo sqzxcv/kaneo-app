@@ -1,5 +1,10 @@
 {
 	"app": {
+		"shell": {
+			"noProjects": "尚無專案",
+			"projectsUnavailable": "專案載入失敗",
+			"workspaceUnavailable": "工作區載入失敗"
+		},
 		"errors": {
 			"badResponse": "伺服器回傳的內容無法識別。"
 		},

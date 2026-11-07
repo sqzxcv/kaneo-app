@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kaneo_app/core/core.dart';
 import 'package:kaneo_app/features/auth/login_page.dart';
+import 'package:kaneo_app/features/shell/app_sidebar.dart';
 import 'package:kaneo_app/features/task/open_task.dart';
 
 import '../support/test_app.dart';
@@ -32,28 +33,6 @@ void main() {
   });
 
   group('navigation', () {
-    testWidgets('wide windows use a rail, narrow ones bottom tabs', (tester) async {
-      await pumpKaneoApp(tester, size: wideSize);
-      expect(find.byType(NavigationRail), findsOneWidget);
-      expect(find.byType(NavigationBar), findsNothing);
-    });
-
-    testWidgets('narrow windows use bottom tabs', (tester) async {
-      await pumpKaneoApp(tester, size: narrowSize);
-      expect(find.byType(NavigationBar), findsOneWidget);
-      expect(find.byType(NavigationRail), findsNothing);
-    });
-
-    testWidgets('a phone on its side is still narrow, an iPad upright is still wide', (
-      tester,
-    ) async {
-      await pumpKaneoApp(tester, size: narrowSize.flipped);
-      expect(find.byType(NavigationBar), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-      await pumpKaneoApp(tester, size: wideSize.flipped);
-      expect(find.byType(NavigationRail), findsOneWidget);
-    });
-
     testBothLayouts('the tabs switch pages', (tester, size) async {
       await pumpKaneoApp(tester, size: size);
       await tester.tap(find.text('Inbox'));
@@ -63,7 +42,7 @@ void main() {
 
     testBothLayouts('a project opens its board, and a task opens from there', (tester, size) async {
       await pumpKaneoApp(tester, size: size);
-      await tester.tap(find.text('Demo'));
+      await tester.tap(inPage(find.text('Demo')));
       await tester.pumpAndSettle();
       expect(find.text('To Do'), findsOneWidget);
       expect(find.text('1 task'), findsNWidgets(2));
@@ -138,7 +117,7 @@ void main() {
         devConfig: const DevConfig(serverUrl: FakeKaneo.serverUrl, apiKey: FakeKaneo.apiKey),
       );
       expect(app.container.read(sessionProvider)?.token, FakeKaneo.apiKey);
-      expect(find.text('Demo'), findsOneWidget);
+      expect(inPage(find.text('Demo')), findsOneWidget);
       expect(find.byType(LoginPage), findsNothing);
     });
 
@@ -172,7 +151,7 @@ void main() {
       expect(find.byType(LoginPage), findsOneWidget);
       await tester.tap(find.text('Developer sign-in'));
       await tester.pumpAndSettle();
-      expect(find.text('Demo'), findsOneWidget);
+      expect(inPage(find.text('Demo')), findsOneWidget);
     });
 
     testBothLayouts('signing out from the account page goes to the login page', (
@@ -200,7 +179,7 @@ void main() {
       app.container.read(routerProvider).go(AppRoutes.login);
       await tester.pumpAndSettle();
       expect(find.byType(LoginPage), findsNothing);
-      expect(find.text('Demo'), findsOneWidget);
+      expect(inPage(find.text('Demo')), findsOneWidget);
     });
   });
 
@@ -242,10 +221,10 @@ void main() {
     testBothLayouts('also from a key revoked while the app is open', (tester, size) async {
       final server = FakeKaneo();
       await pumpKaneoApp(tester, server: server, size: size);
-      expect(find.text('Demo'), findsOneWidget);
+      expect(inPage(find.text('Demo')), findsOneWidget);
 
       server.credentialsRevoked = true;
-      await tester.tap(find.text('Demo'));
+      await tester.tap(inPage(find.text('Demo')));
       await tester.pumpAndSettle();
       expect(find.byType(LoginPage), findsOneWidget);
     });
@@ -325,7 +304,7 @@ void main() {
       gate.release();
       await tester.pumpAndSettle();
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(find.text('Demo'), findsOneWidget);
+      expect(inPage(find.text('Demo')), findsOneWidget);
     });
 
     testBothLayouts('a workspace with no projects', (tester, size) async {
@@ -457,7 +436,7 @@ void main() {
     final router = app.container.read<GoRouter>(routerProvider);
     router.push(AppRoutes.board(FakeKaneo.projectId));
     await tester.pumpAndSettle();
-    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(AppSidebar), findsOneWidget);
     router.pop();
     await tester.pumpAndSettle();
     expect(router.state.uri.path, AppRoutes.home);

@@ -145,7 +145,8 @@ void main() {
       await goTo(
         tester,
         gesture,
-        tester.getCenter(find.byKey(const ValueKey('column-header-done'))),
+        // Next to the sidebar the last column runs off the page, so aim for the start of its header.
+        tester.getTopLeft(find.byKey(const ValueKey('column-header-done'))) + const Offset(20, 20),
       );
       await gesture.up();
       await tester.pumpAndSettle();

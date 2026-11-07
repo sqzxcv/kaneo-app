@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kaneo_app/app.dart';
 import 'package:kaneo_app/core/core.dart';
+import 'package:kaneo_app/features/shell/app_shell.dart' show shellPageKey;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fake_kaneo.dart';
@@ -56,6 +57,11 @@ void setWindowSize(WidgetTester tester, Size size) {
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 }
+
+/// Narrows [finder] to the page, leaving out the navigation around it. Wide windows have a sidebar
+/// that also lists the projects and scrolls, so in a test that runs on both layouts use
+/// `inPage(find.text('Demo'))` and `scrollUntilVisible(..., scrollable: inPage(find.byType(Scrollable)).first)`.
+Finder inPage(Finder finder) => find.descendant(of: find.byKey(shellPageKey), matching: finder);
 
 /// Provider overrides that run the app against [server], with nothing kept on disk.
 Future<List<Override>> _overrides(
