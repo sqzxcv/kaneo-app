@@ -51,6 +51,8 @@ Kaneo 的 Flutter 客户端，覆盖 iOS、iPadOS、Android、macOS、Windows、
 | 宽屏还是窄屏 | `context.isWide` |
 | 路由 | `AppRoutes` |
 | 提示、确认框、菜单 | `showToast`、`showGlobalToast`、`showConfirm`、`showActionMenu` |
+| 右键或长按打开菜单 | `ContextMenuRegion` |
+| 自定义浮层和弹窗 | `showPopover`（宽屏就近浮层，窄屏底部弹层）、`showPanel`（宽屏居中弹窗，窄屏全屏页） |
 | 选择器 | `pickOption`、`pickMany`、`pickStatus`、`pickPriority`、`pickAssignee`、`pickLabels`、`pickDate` |
 | 打开任务、新建任务 | `lib/features/task/open_task.dart` 的 `openTask()`、`openNewTask()` |
 | 显示 Markdown | `lib/features/markdown/markdown_view.dart` 的 `MarkdownView` |

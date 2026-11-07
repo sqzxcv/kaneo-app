@@ -32,4 +32,5 @@ export 'ui/confirm.dart';
 export 'ui/menu.dart';
 export 'ui/pickers.dart';
 export 'ui/placeholder_page.dart';
+export 'ui/popover.dart';
 export 'ui/toast.dart';

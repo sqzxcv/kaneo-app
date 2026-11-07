@@ -181,7 +181,10 @@ ThemeData _theme(Brightness brightness, KaneoColors c) {
       ),
       behavior: SnackBarBehavior.floating,
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: radius, side: border),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(KaneoRadius.lg),
+        side: border,
+      ),
     ),
     // The current app's slim bar: the active tab is ink, the rest gray, with no pill behind it.
     navigationBarTheme: NavigationBarThemeData(

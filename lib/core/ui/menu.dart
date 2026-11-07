@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../layout/breakpoints.dart';
+import '../theme/app_theme.dart';
+import 'popover.dart';
+
 /// One row of an action menu.
 class MenuAction<T> {
   const MenuAction({
@@ -26,27 +30,60 @@ Future<T?> showActionMenu<T>(
   required List<MenuAction<T>> items,
   Offset? position,
 }) {
-  return showModalBottomSheet<T>(
-    context: context,
-    showDragHandle: true,
+  return showPopover<T>(
+    context,
+    position: position,
     builder: (context) {
-      final error = Theme.of(context).colorScheme.error;
-      return SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            for (final item in items)
-              ListTile(
-                enabled: item.enabled,
-                leading: item.icon == null
-                    ? null
-                    : Icon(item.icon, color: item.destructive ? error : null),
-                title: Text(item.label, style: item.destructive ? TextStyle(color: error) : null),
-                onTap: () => Navigator.of(context).pop(item.value),
-              ),
-          ],
-        ),
+      final c = context.colors;
+      return PopoverBody(
+        rows: [
+          for (final item in items)
+            PopoverRow(
+              enabled: item.enabled,
+              title: item.label,
+              color: item.destructive ? c.destructiveForeground : null,
+              leading: item.icon == null
+                  ? null
+                  : Icon(
+                      item.icon,
+                      size: context.isWide ? 16 : 20,
+                      color: item.destructive
+                          ? c.destructiveForeground
+                          : c.foreground.withValues(alpha: 0.8),
+                    ),
+              onTap: () => Navigator.of(context).pop(item.value),
+            ),
+        ],
       );
     },
   );
+}
+
+/// Opens a menu on [child] with a right-click, or a long press on a touch screen, at the pointer.
+class ContextMenuRegion<T> extends StatelessWidget {
+  const ContextMenuRegion({
+    super.key,
+    required this.items,
+    required this.onSelected,
+    required this.child,
+  });
+
+  /// Asked each time the menu opens, so that it shows the current state.
+  final List<MenuAction<T>> Function() items;
+  final ValueChanged<T> onSelected;
+  final Widget child;
+
+  Future<void> _open(BuildContext context, Offset position) async {
+    final chosen = await showActionMenu<T>(context, items: items(), position: position);
+    if (chosen != null) onSelected(chosen);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onSecondaryTapDown: (details) => _open(context, details.globalPosition),
+      onLongPressStart: (details) => _open(context, details.globalPosition),
+      child: child,
+    );
+  }
 }

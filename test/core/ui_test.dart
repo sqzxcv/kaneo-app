@@ -205,8 +205,6 @@ void main() {
       (context) => pickDate(context, title: 'Due', current: DateTime(2026, 3, 9)),
     );
     await tester.tap(find.text('15'));
-    await tester.pump();
-    await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
     expect(runner.result?.value, DateTime(2026, 3, 15));
   });

@@ -33,6 +33,9 @@ const Map<String, Color> _labelColors = {
   'fuchsia': Color(0xFFC800DE),
 };
 
+/// The colors offered for a new label: the palette without its two grays, as in the current app.
+List<String> get labelColorChoices => _labelColors.keys.skip(2).toList();
+
 /// The web app's label palette. Older and imported labels may store a hex color instead.
 Color labelColor(String? value) {
   final named = _labelColors[value];
