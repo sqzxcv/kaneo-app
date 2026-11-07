@@ -246,6 +246,28 @@ void main() {
     expect(h.saver.unsavedText, 'one two');
   });
 
+  testWidgets('discarding drops the text and the failure, and sends nothing more', (tester) async {
+    final sent = <String>[];
+    final saver = DescriptionAutosave(
+      send: (text) async {
+        sent.add(text);
+        throw StateError('refused');
+      },
+    )..begin('original');
+    addTearDown(saver.dispose);
+    saver.edit('failed');
+    await saver.flush();
+    expect(saver.status, DescriptionSaveStatus.failed);
+    saver.edit('waiting');
+
+    saver.discard();
+    expect(saver.hasUnsaved, isFalse);
+    expect(saver.status, DescriptionSaveStatus.idle);
+    await tester.pump(descriptionSaveDelay);
+    await saver.flush();
+    expect(sent, ['failed']);
+  });
+
   testWidgets('sends nothing after being disposed', (tester) async {
     final sent = <String>[];
     final saver = DescriptionAutosave(send: (text) async => sent.add(text))..begin('original');

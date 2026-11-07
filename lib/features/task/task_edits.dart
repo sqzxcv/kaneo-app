@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/misc.dart' show KeepAliveLink;
 
 import '../../core/core.dart';
 import '../board/board_data.dart';
+import 'description_autosave.dart';
 import 'task_activity.dart';
 import 'task_relations.dart';
 
@@ -42,10 +43,7 @@ BoardData boardWithTask(BoardData board, Task task, {String? assigneeImage}) {
     return updateBoardTask(board, task.id, (_) => updated);
   }
 
-  List<BoardTask> without(List<BoardTask>? tasks) => [
-    for (final t in tasks ?? const <BoardTask>[])
-      if (t.id != task.id) t,
-  ];
+  List<BoardTask> without(List<BoardTask>? tasks) => _without(tasks, task.id);
   // A change of status keeps the task's position, so this is where the server will have it too.
   List<BoardTask> into(List<BoardTask>? tasks) => _inPlace(without(tasks), updated);
 
@@ -62,6 +60,11 @@ BoardData boardWithTask(BoardData board, Task task, {String? assigneeImage}) {
         : without(board.archivedTasks),
   );
 }
+
+List<BoardTask> _without(List<BoardTask>? tasks, String id) => [
+  for (final t in tasks ?? const <BoardTask>[])
+    if (t.id != id) t,
+];
 
 List<BoardTask> _inPlace(List<BoardTask> tasks, BoardTask card) =>
     [...tasks, card]
@@ -88,6 +91,13 @@ BoardData boardWithNewCard(BoardData board, BoardTask card) {
         : board.archivedTasks,
   );
 }
+
+/// [board] without the card of the task [id], which has left the project or no longer exists.
+BoardData boardWithoutCard(BoardData board, String id) => board.copyWith(
+  columns: [for (final column in board.columns) column.copyWith(tasks: _without(column.tasks, id))],
+  plannedTasks: _without(board.plannedTasks, id),
+  archivedTasks: _without(board.archivedTasks, id),
+);
 
 /// Undoes a failed edit from [before] to [after], and leaves alone what has changed since.
 Task revertTaskEdit(Task current, {required Task before, required Task after}) {
@@ -292,6 +302,107 @@ class TaskEdits {
       saved.complete(true);
     });
     return saved.future;
+  }
+
+  /// Moves this task to the project [projectId], which picks its number and perhaps a new column.
+  /// Resolves to whether it moved, and says why not otherwise. The task shows the result by then.
+  Future<bool> moveTo(String projectId) {
+    if (!_ref.mounted) return Future.value(false);
+    final moved = Completer<bool>();
+    final api = _ref.read(kaneoApiProvider);
+    _enqueue(() async {
+      final before = _ref.read(taskQuery(taskId)).value;
+      try {
+        await api.moveTask(taskId, projectId);
+      } catch (error) {
+        _report(error);
+        moved.complete(false);
+        return;
+      }
+      if (_ref.mounted) await _refreshIfOpen(taskQuery(taskId));
+      moved.complete(true);
+      if (!_ref.mounted) return;
+      _ref.read(savedTaskProvider.notifier).saved(taskId);
+      if (before != null) _removeCard(before.projectId);
+      await Future.wait([
+        _refreshIfOpen(taskActivitiesQuery(taskId)),
+        _refreshLists({?before?.projectId, projectId}, before?.workspaceId),
+      ]);
+    });
+    return moved.future;
+  }
+
+  /// Makes a copy of this task. Resolves to the copy, or to null after saying why there is none.
+  Future<Task?> duplicate() {
+    if (!_ref.mounted) return Future.value();
+    final copied = Completer<Task?>();
+    final api = _ref.read(kaneoApiProvider);
+    _enqueue(() async {
+      final Task copy;
+      try {
+        copy = await api.duplicateTask(taskId);
+      } catch (error) {
+        _report(error);
+        copied.complete(null);
+        return;
+      }
+      copied.complete(copy);
+      if (!_ref.mounted) return;
+      // A copy of a subtask is a subtask too, so an open parent has to read its list again.
+      _ref.read(savedTaskProvider.notifier).saved(taskId);
+      final workspaceId = _ref.read(taskQuery(taskId)).value?.workspaceId;
+      await _refreshLists({copy.projectId}, workspaceId);
+    });
+    return copied.future;
+  }
+
+  /// Deletes this task. Resolves to whether it is gone, and says why not otherwise.
+  Future<bool> delete() {
+    if (!_ref.mounted) return Future.value(false);
+    final deleted = Completer<bool>();
+    final api = _ref.read(kaneoApiProvider);
+    _enqueue(() async {
+      final task = _ref.read(taskQuery(taskId)).value;
+      try {
+        await api.deleteTask(taskId);
+      } catch (error) {
+        _report(error);
+        deleted.complete(false);
+        return;
+      }
+      deleted.complete(true);
+      if (!_ref.mounted) return;
+      // Closing the text box would otherwise try to save what is in it, and fail.
+      _ref.read(descriptionAutosaveProvider(taskId)).discard();
+      _ref.read(taskQuery(taskId).notifier).forget();
+      _ref.read(savedTaskProvider.notifier).saved(taskId);
+      if (task == null) return;
+      _removeCard(task.projectId);
+      await _refreshLists({task.projectId}, task.workspaceId);
+    });
+    return deleted.future;
+  }
+
+  void _removeCard(String projectId) {
+    final board = boardQuery(projectId);
+    if (!_ref.read(board.exists)) return;
+    final data = _ref.read(board).value;
+    if (data != null) _ref.read(board.notifier).setData(boardWithoutCard(data, taskId));
+  }
+
+  /// What shows the tasks of [projectIds], or counts them, once they have changed.
+  Future<void> _refreshLists(Set<String> projectIds, String? workspaceId) async {
+    if (!_ref.mounted) return;
+    await Future.wait([
+      for (final id in projectIds) ...[
+        _refreshIfOpen(boardQuery(id)),
+        _refreshIfOpen(projectRelationsQuery(id)),
+      ],
+      if (workspaceId != null) ...[
+        _refreshIfOpen(assignedTasksQuery(workspaceId)),
+        _refreshIfOpen(projectsQuery(workspaceId)),
+      ],
+    ]);
   }
 
   void _showSubtaskDone(String subtaskId, bool done) {

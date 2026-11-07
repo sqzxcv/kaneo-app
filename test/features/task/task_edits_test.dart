@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kaneo_app/core/core.dart';
+import 'package:kaneo_app/features/board/board_data.dart';
 import 'package:kaneo_app/features/task/task_edits.dart';
 import 'package:kaneo_app/features/task/task_panel.dart';
 
@@ -129,6 +130,24 @@ void main() {
     test('a task that is not on the board changes nothing', () {
       final board = _board();
       expect(identical(boardWithTask(board, _task('x', 'to-do')), board), isTrue);
+    });
+  });
+
+  group('boardWithoutCard', () {
+    test('takes the card out of its column and leaves the others', () {
+      final board = boardWithoutCard(_board(), 'a');
+      expect(_ids(board.columns.first.tasks), ['b']);
+      expect(_ids(board.columns.last.tasks), ['c', 'd']);
+      expect(_ids(board.plannedTasks), ['p']);
+    });
+
+    test('takes a planned card out too', () {
+      expect(boardWithoutCard(_board(), 'p').plannedTasks, isEmpty);
+    });
+
+    test('leaves a board without the card as it was', () {
+      final board = boardWithoutCard(_board(), 'missing');
+      expect(boardTasks(board).map((t) => t.id), boardTasks(_board()).map((t) => t.id));
     });
   });
 

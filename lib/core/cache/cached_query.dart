@@ -96,6 +96,13 @@ class CachedQuery<T> extends AsyncNotifier<T> {
     state = AsyncData(value);
     unawaited(ref.read(cacheStoreProvider).write(_spec.key, _spec.encode(value)));
   }
+
+  /// Stops remembering the data, for something that no longer exists, so that it can't show again
+  /// from the cache. A page still open on it keeps what it has until it closes.
+  void forget() {
+    _latestLoad++;
+    unawaited(ref.read(cacheStoreProvider).remove(_spec.key));
+  }
 }
 
 /// Requests fail for reasons a retry a moment later will not fix, and the UI offers its own retry.

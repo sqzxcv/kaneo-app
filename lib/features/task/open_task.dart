@@ -33,6 +33,19 @@ void openTaskPage(BuildContext context, String taskId) {
   context.push(AppRoutes.task(taskId));
 }
 
+/// Leaves a task that has just been deleted, for the board of the project it was in, wherever the
+/// task was opened from. [context] is inside the task.
+///
+/// Panels aren't known to the router, so they have to be closed first. A board that is right below
+/// the task is come back to rather than opened again, and is as it was left.
+void leaveDeletedTask(BuildContext context, String projectId) {
+  final router = GoRouter.of(context);
+  final board = AppRoutes.board(projectId);
+  Navigator.of(context).popUntil((route) => route is! TaskPanelRoute);
+  if (router.state.uri.path != board && router.canPop()) router.pop();
+  if (router.state.uri.path != board) router.go(board);
+}
+
 /// Opens the new-task form: a dialog over the page on wide windows, so that the page stays in view,
 /// and a full page on narrow ones. [status] preselects a column when creating from that column.
 ///

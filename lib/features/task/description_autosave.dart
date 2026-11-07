@@ -112,6 +112,15 @@ class DescriptionAutosave extends ChangeNotifier {
     }
   }
 
+  /// Drops text that hasn't been sent, for a task that no longer exists.
+  void discard() {
+    _timer?.cancel();
+    _pending = null;
+    _flushAgain = false;
+    _outcome = DescriptionSaveStatus.idle;
+    _notify();
+  }
+
   void _notify() {
     if (!_disposed) notifyListeners();
   }

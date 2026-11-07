@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/core.dart';
+import 'task_actions.dart';
 import 'task_activity_view.dart';
 import 'task_description.dart';
 import 'task_properties.dart';
@@ -54,6 +55,7 @@ class _TaskBar extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
+    final task = this.task;
     final workspaceId = task?.workspaceId;
     final projects = workspaceId == null ? null : ref.watch(projectsQuery(workspaceId)).value;
     final project = projects?.where((p) => p.id == task?.projectId).firstOrNull;
@@ -88,6 +90,7 @@ class _TaskBar extends ConsumerWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
+        if (task != null) TaskActions(task: task, ticket: ticket),
         if (onClose != null)
           IconButton(
             tooltip: context.t('mobile:common.close'),

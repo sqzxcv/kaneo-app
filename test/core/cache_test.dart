@@ -202,6 +202,37 @@ void main() {
       expect(container.read(cacheStoreProvider).peek('workspaces'), isEmpty);
     });
 
+    test('forgetting keeps what is on screen, and it does not come back from the cache', () async {
+      final server = FakeKaneo();
+      final container = await _container(server);
+      final sub = container.listen(workspacesQuery, (_, _) {});
+      addTearDown(sub.close);
+      await container.read(workspacesQuery.future);
+      await _settle();
+
+      container.read(workspacesQuery.notifier).forget();
+      await _settle();
+      expect(container.read(workspacesQuery).requireValue, isNotEmpty);
+      expect(container.read(cacheStoreProvider).peek('workspaces'), isNull);
+    });
+
+    test('a refresh overtaken by forgetting does not remember it again', () async {
+      final server = FakeKaneo();
+      final container = await _container(server);
+      final sub = container.listen(workspacesQuery, (_, _) {});
+      addTearDown(sub.close);
+      await container.read(workspacesQuery.future);
+
+      final gate = server.hold('api/workspace');
+      final refresh = container.read(workspacesQuery.notifier).refresh();
+      await _settle();
+      container.read(workspacesQuery.notifier).forget();
+      gate.release();
+      await refresh;
+      await _settle();
+      expect(container.read(cacheStoreProvider).peek('workspaces'), isNull);
+    });
+
     test('a slow refresh overtaken by a newer one does not replace its answer', () async {
       final server = FakeKaneo();
       final container = await _container(server);

@@ -37,6 +37,79 @@ Set<String> _shape(Object? value, [String prefix = '']) {
   return const {};
 }
 
+/// What the task menu relies on. Everything is on two temporary projects.
+Future<void> _checkMoveCopyDelete(KaneoApi api, String workspaceId) async {
+  final stamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase();
+  final source = await api.createProject(
+    name: 'C-Move source $stamp',
+    workspaceId: workspaceId,
+    icon: 'Layout',
+    slug: 'CS$stamp',
+  );
+  addTearDown(() => api.deleteProject(source.id));
+  final target = await api.createProject(
+    name: 'C-Move target $stamp',
+    workspaceId: workspaceId,
+    icon: 'Layout',
+    slug: 'CT$stamp',
+  );
+  addTearDown(() => api.deleteProject(target.id));
+  final label = await api.createLabel(name: 'C-$stamp', color: 'red', workspaceId: workspaceId);
+  addTearDown(() => api.deleteLabel(label.id));
+  final blocked = await api.createColumn(source.id, name: 'Blocked');
+  Future<Task> create(String title, String status) => api.createTask(
+    source.id,
+    CreateTaskBody(title: title, description: 'Text', priority: 'low', status: status),
+  );
+  final parent = await create('Parent', 'to-do');
+  final child = await create('Child', blocked.slug);
+  final sibling = await create('Sibling', 'in-progress');
+  await api.createRelation(parent.id, child.id, 'subtask');
+  await api.attachLabel(label.id, child.id);
+  Matcher failsWith(int status) =>
+      throwsA(isA<ApiError>().having((e) => e.status, 'status', status));
+
+  // A copy keeps the column and the labels, stays a subtask, and has a number of its own.
+  final copy = await api.duplicateTask(child.id);
+  expect(copy.id, isNot(child.id));
+  expect(copy.title, child.title);
+  expect(copy.status, blocked.slug);
+  expect(copy.number, sibling.number! + 1);
+  expect([for (final l in await api.taskLabels(copy.id)) l.name], [label.name]);
+  Future<Set<String>> subtasks() async => {
+    for (final r in await api.relations(parent.id))
+      if (r.relationType == 'subtask') r.targetTaskId,
+  };
+  expect(await subtasks(), {child.id, copy.id});
+
+  // A move needs somewhere else to go, and a project that exists.
+  await expectLater(api.moveTask(child.id, source.id), failsWith(400));
+  await expectLater(api.moveTask(child.id, 'no-such-project'), failsWith(404));
+
+  // Without its column it goes to the first one. It gets the number the new project is up to, and
+  // stays linked to its parent.
+  await api.moveTask(child.id, target.id);
+  final moved = await api.task(child.id);
+  expect(moved.projectId, target.id);
+  expect(moved.status, (await api.columns(target.id)).first.slug);
+  expect(moved.number, 1);
+  expect(moved.workspaceId, workspaceId);
+  final link = (await api.relations(parent.id)).firstWhere((r) => r.targetTaskId == child.id);
+  expect(link.targetTask?.projectId, target.id);
+  expect(link.targetTask?.number, 1);
+
+  // With its column it stays in it.
+  await api.moveTask(sibling.id, target.id);
+  expect((await api.task(sibling.id)).status, 'in-progress');
+  expect((await api.task(sibling.id)).number, 2);
+
+  // Deleting takes the links with it, so that the other end reads as before they were made.
+  await api.deleteTask(parent.id);
+  await expectLater(api.task(parent.id), failsWith(404));
+  expect(await api.relations(child.id), isEmpty);
+  expect(await api.relations(copy.id), isEmpty);
+}
+
 void main() {
   late I18n i18n;
   late ApiClient real;
@@ -257,6 +330,14 @@ void main() {
       await api.archiveProject(project.id);
       await api.unarchiveProject(project.id);
     });
+
+    test(
+      'moving, copying and deleting a task do the same on the server and on FakeKaneo',
+      () async {
+        await _checkMoveCopyDelete(api, _workspaceId);
+        await _checkMoveCopyDelete(KaneoApi(fake, i18n), FakeKaneo.workspaceId);
+      },
+    );
 
     test('the API key from dev.env works, in the x-api-key header', () async {
       final byKey = KaneoApi(client(_serverUrl, _apiKey, null), i18n);

@@ -1235,22 +1235,88 @@ class FakeKaneo implements HttpClientAdapter {
     _route('PUT', 'api/task/move/:id', (request, params) {
       final body = _body(request);
       final task = _find(tasks, params[0], 'Task');
-      task['projectId'] = body['destinationProjectId'];
-      if (body['destinationStatus'] != null) task['status'] = body['destinationStatus'];
-      return _taskDetail(task);
+      final sourceId = task['projectId'] as String;
+      final destinationId = body['destinationProjectId'] as String;
+      if (destinationId == sourceId) {
+        return _error(400, 'Task is already in that project', 'BAD_REQUEST');
+      }
+      final destination = _find(projects, destinationId, 'Project');
+      // Like the server, this takes a column asked for, or else the one with the task's status, or
+      // else the first. The task gets a number in the project it joins, and a place at the end.
+      final workflow = columns.where((c) => c['projectId'] == destinationId).toList()
+        ..sort(_byPosition);
+      final slugs = [for (final column in workflow) column['slug'] as String];
+      if (slugs.isEmpty) {
+        return _error(400, 'Destination project does not have a workflow', 'BAD_REQUEST');
+      }
+      final requested = body['destinationStatus'] as String?;
+      if (requested != null && !slugs.contains(requested)) {
+        return _error(
+          400,
+          'Selected status is not valid for the destination project',
+          'BAD_REQUEST',
+        );
+      }
+      final oldStatus = task['status'] as String;
+      final status = requested ?? (slugs.contains(oldStatus) ? oldStatus : slugs.first);
+      final number = (destination['lastTaskNumber'] as int) + 1;
+      destination['lastTaskNumber'] = number;
+      task.addAll({
+        'projectId': destinationId,
+        'status': status,
+        'number': number,
+        'position': tasks
+            .where((t) => t['projectId'] == destinationId && t['status'] == status)
+            .length,
+      });
+      _logActivity(
+        task['id'] as String,
+        'moved',
+        eventData: {
+          'fromProjectId': sourceId,
+          'fromProjectName': _find(projects, sourceId, 'Project')['name'],
+          'toProjectId': destinationId,
+          'toProjectName': destination['name'],
+          'oldStatus': oldStatus,
+          'newStatus': status,
+        },
+      );
+      return {
+        'task': _taskDetail(task),
+        'sourceProjectId': sourceId,
+        'destinationProjectId': destinationId,
+      };
     });
     _route('POST', 'api/task/duplicate/:id', (request, params) {
       final source = _find(tasks, params[0], 'Task');
-      return _taskDetail(
-        addTask(
-          projectId: source['projectId'] as String,
-          title: source['title'] as String,
-          description: source['description'] as String,
-          status: source['status'] as String,
-          priority: source['priority'] as String,
-          assigneeId: source['userId'] as String?,
-        ),
+      final sourceId = source['id'] as String;
+      final parents = [
+        for (final relation in relations)
+          if (relation['targetTaskId'] == sourceId && relation['relationType'] == 'subtask')
+            relation['sourceTaskId'] as String,
+      ];
+      if (parents.isNotEmpty && capabilities['updateTasks'] != true) {
+        return _error(403, 'Duplicating parent links requires task:update permission', 'FORBIDDEN');
+      }
+      final copy = addTask(
+        projectId: source['projectId'] as String,
+        title: source['title'] as String,
+        description: source['description'] as String,
+        status: source['status'] as String,
+        priority: source['priority'] as String,
+        assigneeId: source['userId'] as String?,
+        startDate: source['startDate'] as String?,
+        dueDate: source['dueDate'] as String?,
       );
+      final copyId = copy['id'] as String;
+      // Like the server, the copy has the labels and the parents, and not the subtasks.
+      for (final label in _taskLabels(sourceId)) {
+        addLabel(label['name'] as String, color: label['color'] as String, taskId: copyId);
+      }
+      for (final parent in parents) {
+        addRelation(parent, copyId);
+      }
+      return _taskDetail(copy);
     });
     _route('POST', 'api/task/reorder', (request, params) {
       for (final item in (_body(request)['tasks'] as List).cast<Map<String, dynamic>>()) {
@@ -1352,7 +1418,14 @@ class FakeKaneo implements HttpClientAdapter {
     });
     _route('DELETE', 'api/task/:id', (request, params) {
       final task = _find(tasks, params[0], 'Task');
+      final id = task['id'];
       tasks.remove(task);
+      // Like the server, this takes everything that hangs off the task with it.
+      relations.removeWhere((r) => r['sourceTaskId'] == id || r['targetTaskId'] == id);
+      labels.removeWhere((l) => l['taskId'] == id);
+      activities.removeWhere((a) => a['taskId'] == id);
+      externalLinks.removeWhere((l) => l['taskId'] == id);
+      customFieldValues.removeWhere((v) => v['taskId'] == id);
       return task;
     });
 
