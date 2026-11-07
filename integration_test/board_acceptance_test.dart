@@ -553,8 +553,14 @@ void main() {
     );
     await shot(tester, '12-external-update');
     if (Platform.isMacOS) {
-      await windowManager.setSize(const Size(960, 700));
-      await tester.pumpAndSettle();
+      debugPrint('B_CHECK narrow-window resize');
+      var resized = false;
+      final resizing = windowManager.setSize(const Size(960, 700)).then((_) => resized = true);
+      // Live device tests must keep delivering frames while native resize completes.
+      expect(await until(tester, () => resized, seconds: 10), isTrue);
+      await resizing;
+      debugPrint('B_CHECK narrow-window resized');
+      await tester.pumpAndSettle(timeout: const Duration(seconds: 10));
       expect(find.byKey(const ValueKey('board-horizontal')), findsOneWidget);
       expect(find.byKey(ValueKey('column-header-${columns[1].slug}')), findsOneWidget);
       await shot(tester, '13-narrow-window');
