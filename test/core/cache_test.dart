@@ -182,6 +182,76 @@ void main() {
       expect(container.read(cacheStoreProvider).peek('workspaces'), isEmpty);
     });
 
+    test('a refresh overtaken by setData does not undo it', () async {
+      final server = FakeKaneo();
+      final container = await _container(server);
+      final sub = container.listen(workspacesQuery, (_, _) {});
+      addTearDown(sub.close);
+      await container.read(workspacesQuery.future);
+
+      final gate = server.hold('api/workspace');
+      final refresh = container.read(workspacesQuery.notifier).refresh();
+      await _settle();
+      container.read(workspacesQuery.notifier).setData(const []);
+      gate.release();
+      await refresh;
+      await _settle();
+
+      expect(container.read(workspacesQuery).requireValue, isEmpty);
+      expect(container.read(workspacesQuery).isLoading, isFalse);
+      expect(container.read(cacheStoreProvider).peek('workspaces'), isEmpty);
+    });
+
+    test('a slow refresh overtaken by a newer one does not replace its answer', () async {
+      final server = FakeKaneo();
+      final container = await _container(server);
+      final sub = container.listen(workspacesQuery, (_, _) {});
+      addTearDown(sub.close);
+      await container.read(workspacesQuery.future);
+      final notifier = container.read(workspacesQuery.notifier);
+
+      // The first request answers last, with what it read before the second one.
+      final answers = ['Newest', 'Stale'];
+      server.on('api/workspace', (request) {
+        return FakeResponse(200, [
+          {...server.workspaces.first, 'name': answers.removeAt(0)},
+        ]);
+      });
+      server.latency = const Duration(milliseconds: 100);
+      final first = notifier.refresh();
+      await _settle();
+      server.latency = Duration.zero;
+      await notifier.refresh();
+      expect(container.read(workspacesQuery).requireValue.single.name, 'Newest');
+
+      await first;
+      await _settle();
+      expect(answers, isEmpty);
+      expect(container.read(workspacesQuery).requireValue.single.name, 'Newest');
+      final cached = container.read(cacheStoreProvider).peek('workspaces')! as List;
+      expect((cached.single as Map)['name'], 'Newest');
+    });
+
+    test('a refresh still fills the cache when its page closed meanwhile', () async {
+      final server = FakeKaneo();
+      final container = await _container(server);
+      final sub = container.listen(workspacesQuery, (_, _) {});
+      await container.read(workspacesQuery.future);
+
+      final gate = server.hold('api/workspace');
+      final refresh = container.read(workspacesQuery.notifier).refresh();
+      await _settle();
+      sub.close();
+      await _settle();
+      server.workspaces.first['name'] = 'Renamed';
+      gate.release();
+      await refresh;
+      await _settle();
+
+      final cached = container.read(cacheStoreProvider).peek('workspaces')! as List;
+      expect((cached.single as Map)['name'], 'Renamed');
+    });
+
     test('accounts do not share a cache directory', () async {
       final root = await Directory.systemTemp.createTemp('kaneo-cache-root');
       addTearDown(() => root.delete(recursive: true));

@@ -110,7 +110,7 @@ Future<String?> pickPriority(BuildContext context, {String? current, Offset? pos
         PickerOption(
           value: value,
           label: priorityLabel(context, value),
-          leading: _PriorityIcon(priority: value),
+          leading: PriorityIcon(priority: value),
         ),
     ],
   );
@@ -640,8 +640,8 @@ class _StatusIcon extends StatelessWidget {
 }
 
 /// A priority's three marks, as in the current app.
-class _PriorityIcon extends StatelessWidget {
-  const _PriorityIcon({required this.priority});
+class PriorityIcon extends StatelessWidget {
+  const PriorityIcon({super.key, required this.priority});
 
   final String priority;
 

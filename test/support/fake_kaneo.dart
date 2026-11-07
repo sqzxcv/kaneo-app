@@ -1427,13 +1427,17 @@ class FakeKaneo implements HttpClientAdapter {
       ];
     });
     _route('PATCH', 'api/notification/read-all', (request, params) {
+      final workspace = request.query['workspaceId'];
       for (final notification in notifications) {
-        notification['isRead'] = true;
+        if (workspace == null || _notificationIn(notification, workspace)) {
+          notification['isRead'] = true;
+        }
       }
       return {'success': true};
     });
     _route('DELETE', 'api/notification/clear-all', (request, params) {
-      notifications.clear();
+      final workspace = request.query['workspaceId'];
+      notifications.removeWhere((n) => workspace == null || _notificationIn(n, workspace));
       return {'success': true};
     });
     _route('PATCH', 'api/notification/:id/read', (request, params) {

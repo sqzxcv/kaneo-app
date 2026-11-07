@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/core.dart';
+import '../inbox/notifications.dart';
 import 'app_sidebar.dart';
 
 /// Marks the page next to the navigation, so that tests can look inside the page only.
@@ -29,17 +33,39 @@ const _tabs = [
 ///
 /// [child] holds the open pages. It keeps its state when the window crosses the breakpoint, because
 /// go_router gives it a global key, so the two layouts are free to place it differently.
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.location, required this.child});
 
   final Uri location;
   final Widget child;
 
   @override
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  @override
+  void didUpdateWidget(AppShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.location.path != widget.location.path) scheduleMicrotask(_refreshInbox);
+  }
+
+  /// The navigation shows the unread count on every page, which keeps the notifications open and so
+  /// stops them refreshing by themselves. Moving between pages, into the inbox too, refreshes them.
+  void _refreshInbox() {
+    if (!mounted) return;
+    final workspace = ref.read(currentWorkspaceProvider).value;
+    if (workspace == null) return;
+    if (ref.read(notificationsQuery(workspace.id)).hasValue) {
+      unawaited(ref.read(inboxActionsProvider(workspace.id)).refresh());
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final page = KeyedSubtree(key: shellPageKey, child: child);
-    if (context.isWide) return _WideShell(location: location, page: page);
-    return _NarrowShell(location: location, page: page);
+    final page = KeyedSubtree(key: shellPageKey, child: widget.child);
+    if (context.isWide) return _WideShell(location: widget.location, page: page);
+    return _NarrowShell(location: widget.location, page: page);
   }
 }
 
@@ -81,15 +107,16 @@ class _WideShell extends StatelessWidget {
   }
 }
 
-class _NarrowShell extends StatelessWidget {
+class _NarrowShell extends ConsumerWidget {
   const _NarrowShell({required this.location, required this.page});
 
   final Uri location;
   final Widget page;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final index = _tabs.indexWhere((tab) => tab.path == location.path);
+    final unread = ref.watch(inboxUnreadCountProvider);
     return Scaffold(
       // Pages draw their own top and bottom insets. A phone on its side has a notch on one side.
       body: SafeArea(top: false, bottom: false, child: page),
@@ -104,10 +131,37 @@ class _NarrowShell extends StatelessWidget {
                 onDestinationSelected: (selected) => context.go(_tabs[selected].path),
                 destinations: [
                   for (final tab in _tabs)
-                    NavigationDestination(icon: Icon(tab.icon), label: context.t(tab.labelKey)),
+                    NavigationDestination(
+                      icon: tab.path == AppRoutes.inbox && unread > 0
+                          ? _UnreadBadge(count: unread, child: Icon(tab.icon))
+                          : Icon(tab.icon),
+                      label: context.t(tab.labelKey),
+                    ),
                 ],
               ),
             ),
+    );
+  }
+}
+
+/// The current app's unread count on the inbox tab.
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count, required this.child});
+
+  final int count;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: context.t('mobile:nav.inboxUnread', {'count': count}),
+      child: Badge(
+        key: inboxUnreadKey,
+        backgroundColor: context.colors.info,
+        textColor: Colors.white,
+        label: Text(unreadLabel(count)),
+        child: child,
+      ),
     );
   }
 }

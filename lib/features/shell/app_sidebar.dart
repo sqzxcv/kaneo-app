@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/core.dart';
+import '../inbox/notifications.dart';
 import 'workspace_switch.dart';
 
 /// The web app's sidebar width.
@@ -52,12 +53,14 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
   Widget build(BuildContext context) {
     final path = widget.location.path;
 
-    Widget destination(String route, String labelKey, IconData icon) => _SidebarRow(
-      icon: icon,
-      label: context.t(labelKey),
-      selected: path == route,
-      onTap: () => context.go(route),
-    );
+    Widget destination(String route, String labelKey, IconData icon, {Widget? trailing}) =>
+        _SidebarRow(
+          icon: icon,
+          label: context.t(labelKey),
+          selected: path == route,
+          trailing: trailing,
+          onTap: () => context.go(route),
+        );
 
     return SizedBox(
       width: sidebarWidth,
@@ -71,7 +74,12 @@ class _AppSidebarState extends ConsumerState<AppSidebar> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 destination(AppRoutes.home, 'navigation:sidebar.home', LucideIcons.house),
-                destination(AppRoutes.inbox, 'navigation:sidebar.inbox', LucideIcons.inbox),
+                destination(
+                  AppRoutes.inbox,
+                  'navigation:sidebar.inbox',
+                  LucideIcons.inbox,
+                  trailing: const _UnreadCount(),
+                ),
                 destination(
                   AppRoutes.myTasks,
                   'navigation:sidebar.myTasks',
@@ -131,6 +139,32 @@ class _WorkspaceHeader extends ConsumerWidget {
           onPressed: () => context.go(AppRoutes.search),
         ),
       ],
+    );
+  }
+}
+
+/// The web app's unread count at the end of the inbox row.
+class _UnreadCount extends ConsumerWidget {
+  const _UnreadCount();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(inboxUnreadCountProvider);
+    if (count == 0) return const SizedBox.shrink();
+    final c = context.colors;
+    return Semantics(
+      label: context.t('mobile:nav.inboxUnread', {'count': count}),
+      child: Container(
+        key: inboxUnreadKey,
+        constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: c.foreground, borderRadius: BorderRadius.circular(9)),
+        child: Text(
+          unreadLabel(count),
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c.background),
+        ),
+      ),
     );
   }
 }

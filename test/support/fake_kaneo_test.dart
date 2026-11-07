@@ -64,6 +64,17 @@ void main() {
       final everything = await api.notifications();
       expect(everything.length, theirs.length + ours.length);
     });
+
+    test('marks and clears only its own inbox, as on the real server', () async {
+      await api.markAllNotificationsRead(workspaceId: other);
+      final ours = await api.notifications(workspaceId: FakeKaneo.workspaceId);
+      expect(ours.where((n) => n.isRead != true), isNotEmpty);
+      expect((await api.notifications(workspaceId: other)).every((n) => n.isRead == true), isTrue);
+
+      await api.clearAllNotifications(workspaceId: other);
+      expect(await api.notifications(workspaceId: other), isEmpty);
+      expect((await api.notifications(workspaceId: FakeKaneo.workspaceId)), hasLength(ours.length));
+    });
   });
 
   test('wrong credentials get 401, the way the real server answers', () async {

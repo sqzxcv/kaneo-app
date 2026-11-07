@@ -30,6 +30,8 @@ class CachedQuery<T> extends AsyncNotifier<T> {
 
   final QuerySpec<T> _spec;
 
+  int _latestLoad = 0;
+
   @override
   FutureOr<T> build() {
     final store = ref.watch(cacheStoreProvider);
@@ -70,19 +72,27 @@ class CachedQuery<T> extends AsyncNotifier<T> {
   }
 
   /// Loads again while the current data stays visible. Never throws; check `state.hasError`.
+  ///
+  /// Only the latest load counts. One that a newer load or [setData] has overtaken is dropped, so
+  /// that an answer read before a change can't undo that change on screen or in the cache.
   Future<void> refresh() async {
     if (!ref.mounted) return;
+    final load = ++_latestLoad;
+    final store = ref.read(cacheStoreProvider);
     state = AsyncLoading<T>();
     try {
-      final fresh = await _fetchAndStore();
+      final fresh = await _spec.fetch(ref);
+      if (load != _latestLoad) return;
+      unawaited(store.write(_spec.key, _spec.encode(fresh)));
       if (ref.mounted) state = AsyncData(fresh);
     } catch (error, stack) {
-      if (ref.mounted) state = AsyncError<T>(error, stack);
+      if (load == _latestLoad && ref.mounted) state = AsyncError<T>(error, stack);
     }
   }
 
   /// Replaces the data right away, such as for an optimistic update, and remembers it.
   void setData(T value) {
+    _latestLoad++;
     state = AsyncData(value);
     unawaited(ref.read(cacheStoreProvider).write(_spec.key, _spec.encode(value)));
   }
