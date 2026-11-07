@@ -21,6 +21,9 @@ case "$1 $2 $3" in
   fi
   ;;
 "simctl bootstatus "*)
+  if [[ -n "${FAKE_XCRUN_HANG_BOOT:-}" ]]; then
+    sleep 300
+  fi
   echo "    Booted device ($2) ($3) (Booted)" >>"$state/booted"
   ;;
 esac
@@ -53,8 +56,11 @@ void main() {
     };
   });
 
-  Future<Process> start(List<String> arguments) =>
-      Process.start('bash', ['tool/with_device.sh', ...arguments], environment: environment);
+  Future<Process> start(List<String> arguments, {int? timeout}) => Process.start(
+    'bash',
+    ['tool/with_device.sh', ...arguments],
+    environment: {...environment, if (timeout != null) 'KANEO_DEVICE_TIMEOUT': '$timeout'},
+  );
 
   List<String> xcrunCalls() {
     final calls = File('${state.path}/calls');
@@ -118,6 +124,131 @@ void main() {
     final errors = process.stderr.transform(const SystemEncoding().decoder).join();
     expect(await process.exitCode, 2);
     expect(await errors, contains('--boot'));
+  });
+
+  group('timeout', () {
+    bool isRunning(int pid) => Process.runSync('kill', ['-0', '$pid']).exitCode == 0;
+
+    Future<int> readPid(File file) async {
+      while (!file.existsSync() || file.readAsStringSync().trim().isEmpty) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      return int.parse(file.readAsStringSync().trim());
+    }
+
+    Future<void> expectGone(int pid) async {
+      for (var i = 0; i < 100 && isRunning(pid); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(isRunning(pid), isFalse, reason: 'process $pid should be gone');
+    }
+
+    test('a hung command is killed with its children, and the queue is free again', () async {
+      final child = File('${directory.path}/child');
+      final hung = await start([
+        'bash',
+        '-c',
+        'sleep 300 & echo \$! > "${child.path}"; wait',
+      ], timeout: 1);
+      final errors = hung.stderr.transform(const SystemEncoding().decoder).join();
+      expect(await hung.exitCode, 124);
+      expect(await errors, contains('timed out after 1 seconds'));
+      await expectGone(await readPid(child));
+
+      final next = await start(['true']);
+      expect(await next.exitCode.timeout(const Duration(seconds: 5)), 0);
+    });
+
+    test('a command that ignores TERM is killed anyway', () async {
+      final pidFile = File('${directory.path}/pid');
+      final stubborn = await start([
+        'bash',
+        '-c',
+        'trap "" TERM; echo \$\$ > "${pidFile.path}"; while :; do sleep 0.1; done',
+      ], timeout: 1);
+      expect(await stubborn.exitCode, 124);
+      await expectGone(await readPid(pidFile));
+    });
+
+    test('a process outside the command stays alive, even in the caller\'s group', () async {
+      final sibling = File('${directory.path}/sibling');
+      // A shell without job control keeps both its background job and the script in its own group.
+      final caller = await Process.start(
+        'bash',
+        [
+          '-c',
+          // It must not keep the output open, or reading the output would wait for it.
+          'sleep 300 >/dev/null 2>&1 & echo \$! > "${sibling.path}"; '
+              'bash tool/with_device.sh sleep 300; echo \$?',
+        ],
+        environment: {...environment, 'KANEO_DEVICE_TIMEOUT': '1'},
+      );
+      final output = caller.stdout.transform(const SystemEncoding().decoder).join();
+      final pid = await readPid(sibling);
+      addTearDown(() => Process.killPid(pid));
+      expect(await caller.exitCode, 0);
+      expect((await output).trim(), '124');
+      expect(isRunning(pid), isTrue);
+    });
+
+    test('only the simulator it started is shut down', () async {
+      final hung = await start(['--boot', 'iPhone 17', 'sleep', '300'], timeout: 1);
+      expect(await hung.exitCode, 124);
+      final calls = xcrunCalls();
+      expect(calls.where((c) => c.startsWith('simctl shutdown')), ['simctl shutdown $_iPhone']);
+      expect(calls.any((c) => c.contains('shutdown all')), isFalse);
+    });
+
+    test('a simulator that never boots counts against the limit', () async {
+      environment['FAKE_XCRUN_HANG_BOOT'] = '1';
+      final hung = await start(['--boot', 'iPhone 17', ...job('never')], timeout: 1);
+      expect(await hung.exitCode, 124);
+      expect(log.existsSync(), isFalse);
+      expect(xcrunCalls(), contains('simctl shutdown $_iPhone'));
+    });
+
+    test('time spent in line does not count', () async {
+      final first = await start(job('a', seconds: 2));
+      while (!log.existsSync()) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      final second = await start(job('b', seconds: 0), timeout: 1);
+      expect(await first.exitCode, 0);
+      expect(await second.exitCode, 0);
+      expect(log.readAsLinesSync().last, 'end-b');
+    });
+
+    test('a command that itself exits with 124 is not reported as a timeout', () async {
+      final process = await start(['bash', '-c', 'exit 124']);
+      final errors = process.stderr.transform(const SystemEncoding().decoder).join();
+      expect(await process.exitCode, 124);
+      expect(await errors, isNot(contains('timed out')));
+    });
+
+    test('stopping the script stops the command, which runs in its own group', () async {
+      final pids = File('${directory.path}/pids');
+      final process = await start([
+        'bash',
+        '-c',
+        'echo "\$PPID \$\$" > "${pids.path}.tmp"; mv "${pids.path}.tmp" "${pids.path}"; exec sleep 300',
+      ]);
+      while (!pids.existsSync()) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      final [script, command] = pids.readAsStringSync().trim().split(' ').map(int.parse).toList();
+      Process.killPid(script);
+      await expectGone(command);
+      expect(await process.exitCode, 143);
+    });
+
+    test('a limit that is not a number of seconds fails before joining the queue', () async {
+      environment['KANEO_DEVICE_TIMEOUT'] = '20m';
+      final process = await start(job('never'));
+      final errors = process.stderr.transform(const SystemEncoding().decoder).join();
+      expect(await process.exitCode, 2);
+      expect(await errors, contains('KANEO_DEVICE_TIMEOUT'));
+      expect(log.existsSync(), isFalse);
+    });
   });
 
   group('simulators', () {

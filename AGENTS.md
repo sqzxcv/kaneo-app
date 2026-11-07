@@ -74,6 +74,7 @@ Kaneo 的 Flutter 客户端，覆盖 iOS、iPadOS、Android、macOS、Windows、
 - 平时只跑 `flutter analyze` 和 `flutter test`，不开模拟器
 - iOS 模拟器和完整构建必须用 `tool/with_device.sh` 排队，同一时间只运行一个，用完关闭。不开 Android 模拟器
 - 用 `--boot` 启动的模拟器，`tool/with_device.sh` 结束时会关闭。别的模拟器不是你的，不要关，也不要用 `xcrun simctl shutdown all`
+- `tool/with_device.sh` 拿到队列后默认最多运行 20 分钟（排队时间不算），超时后杀掉它启动的进程组、释放队列，以退出码 124 结束。确实要跑更久时用 `KANEO_DEVICE_TIMEOUT=<秒数>`
 
 macOS 设备测试每条线使用自己固定的测试 bundle ID，并保持本地签名身份一致：A 线 `app.kaneo.kaneoApp.ATest`、B 线 `app.kaneo.kaneoApp.BTest`、C 线 `app.kaneo.kaneoApp.CTest`、D 线 `app.kaneo.kaneoApp.DTest`。通过本次命令的 `FLUTTER_XCODE_PRODUCT_BUNDLE_IDENTIFIER` 环境变量覆盖，不改仓库里的正式 bundle ID，也不要把测试覆盖带进分发构建。不同签名共用同一个 macOS 应用容器可能卡在 `_libsecinit_appsandbox`，测试不会自行退出，还会一直占用设备队列。
 
