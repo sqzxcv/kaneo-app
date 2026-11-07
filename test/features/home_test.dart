@@ -697,10 +697,5 @@ void main() {
       await tester.pumpAndSettle();
       expect(app.container.read(routerProvider).state.uri.path, AppRoutes.account);
     });
-
-    testBothLayouts('the page is not a placeholder any more', (tester, size) async {
-      final app = await pumpKaneoApp(tester, size: size);
-      expect(find.text(app.i18n.t('app:placeholder.notice')), findsNothing);
-    });
   });
 }

@@ -342,10 +342,4 @@ void main() {
     expect(find.textContaining('Bold'), findsWidgets);
     expect(find.textContaining('**'), findsNothing);
   });
-
-  testBothLayouts('PlaceholderPage says it is a placeholder', (tester, size) async {
-    await pumpInApp(tester, const PlaceholderPage(title: 'Later'), size: size);
-    expect(find.text('Later'), findsOneWidget);
-    expect(find.textContaining('Placeholder page'), findsOneWidget);
-  });
 }

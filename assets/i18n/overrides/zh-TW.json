@@ -11,11 +11,7 @@
 		"errors": {
 			"badResponse": "伺服器回傳的內容無法識別。"
 		},
-		"placeholder": {
-			"notice": "這是佔位頁，正式頁面由後續任務實作。"
-		},
 		"auth": {
-			"signInPending": "登入表單由 KAN-23 實作。",
 			"devSignIn": "開發登入",
 			"selfHosted": "登入你自己的 Kaneo 伺服器。",
 			"passwordLogin": "帳號密碼",

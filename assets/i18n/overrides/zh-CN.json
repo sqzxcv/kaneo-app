@@ -11,11 +11,7 @@
 		"errors": {
 			"badResponse": "服务器返回的内容无法识别。"
 		},
-		"placeholder": {
-			"notice": "这是占位页，正式页面由后续任务实现。"
-		},
 		"auth": {
-			"signInPending": "登录表单由 KAN-23 实现。",
 			"devSignIn": "开发登录",
 			"selfHosted": "登录你自己的 Kaneo 服务器。",
 			"passwordLogin": "账号密码",

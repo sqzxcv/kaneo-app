@@ -11,11 +11,7 @@
 		"errors": {
 			"badResponse": "The server sent a response this app can't read."
 		},
-		"placeholder": {
-			"notice": "Placeholder page. The real page comes with a later task."
-		},
 		"auth": {
-			"signInPending": "The sign-in form comes with KAN-23.",
 			"devSignIn": "Developer sign-in",
 			"selfHosted": "Sign in to your own Kaneo server.",
 			"passwordLogin": "Email and password",

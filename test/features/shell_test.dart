@@ -880,7 +880,6 @@ void main() {
 
     testBothLayouts('the account page is a real page now', (tester, size) async {
       final app = await pumpKaneoApp(tester, size: size, location: AppRoutes.account);
-      expect(find.text(app.i18n.t('app:placeholder.notice')), findsNothing);
       expect(find.text('Test User'), findsOneWidget);
       expect(find.byKey(const ValueKey('language')), findsOneWidget);
       expect(find.byKey(const ValueKey('theme')), findsOneWidget);

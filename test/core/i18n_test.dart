@@ -275,6 +275,5 @@ void main() {
     final i18n = (await tester.runAsync(() => I18n.load(locale: 'zh-CN')))!;
     expect(i18n.t('mobile:common.cancel'), isNot('mobile:common.cancel'));
     expect(i18n.t('mobile:account.deleteAccount.title'), '删除账户');
-    expect(i18n.t('app:placeholder.notice'), contains('占位页'));
   });
 }
