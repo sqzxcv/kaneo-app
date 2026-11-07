@@ -69,6 +69,8 @@ class DesktopRuntime {
   Future<void> setEnabled(bool enabled) async {
     if (_enabled == enabled) return;
     _enabled = enabled;
+    // Recheck native settings when the user opts in again after changing OS permissions.
+    if (!enabled) _permission = null;
     await _restart();
   }
 

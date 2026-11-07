@@ -112,6 +112,19 @@ void main() {
     expect(host.permissionRequests, 1);
   });
 
+  test('opting in again rechecks permission after the user changes OS settings', () async {
+    host.allowed = false;
+    await start();
+    expect(host.permissionRequests, 1);
+    await runtime.setEnabled(false);
+    host.allowed = true;
+    await runtime.setEnabled(true);
+    expect(host.permissionRequests, 2);
+    data = [...data, notice('after-grant')];
+    await runtime.check();
+    expect(host.notices.single.title, 'Notice after-grant');
+  });
+
   test('read notices and notifications for another user are never shown', () async {
     await start();
     data = [...data, notice('read', isRead: true), notice('other', userId: 'someone-else')];
