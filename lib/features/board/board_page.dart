@@ -283,7 +283,15 @@ class _BoardPageState extends ConsumerState<BoardPage> {
             value: value,
             onRetry: _refresh,
             isEmpty: (board) => board.columns.isEmpty,
-            empty: StatusMessage(title: context.t('mobile:board.noTasksHere')),
+            empty: StatusMessage(
+              title: context.t('mobile:board.noTasksHere'),
+              action: TextButton.icon(
+                key: const ValueKey('board-empty-add-task'),
+                icon: const Icon(LucideIcons.plus, size: 16),
+                label: Text(context.t('mobile:board.addTask')),
+                onPressed: () => openNewTask(context, projectId: widget.projectId),
+              ),
+            ),
             builder: (context, board) => RefreshIndicator(
               key: _refreshKey,
               onRefresh: _refresh,

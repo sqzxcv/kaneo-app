@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:kaneo_app/core/core.dart';
 
+import '../task/open_task.dart';
 import 'board_card.dart';
 import 'board_icons.dart';
 import 'board_data.dart';
@@ -220,7 +221,7 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
           children: [
             Padding(
               key: ValueKey('column-header-${column.id}'),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
               child: Row(
                 children: [
                   Icon(boardColumnIcon(column), size: 16, color: context.colors.chipIcon),
@@ -237,6 +238,16 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
                     context.t('app:board.taskCount', {'count': tasks.length}),
                     style: TextStyle(fontSize: 11, color: context.colors.boardId),
                   ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    key: ValueKey('add-task-column-${column.slug}'),
+                    tooltip: context.t('mobile:board.addTask'),
+                    icon: const Icon(LucideIcons.plus, size: 16),
+                    constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                    padding: EdgeInsets.zero,
+                    onPressed: () =>
+                        openNewTask(context, projectId: widget.board.id, status: column.slug),
+                  ),
                 ],
               ),
             ),
@@ -252,10 +263,26 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
                   itemBuilder: (context, index) => rows.isEmpty
                       ? Padding(
                           padding: const EdgeInsets.all(24),
-                          child: Text(
-                            widget.emptyMessage ?? context.t('mobile:board.noTasksHere'),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: context.colors.mutedForeground),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                widget.emptyMessage ?? context.t('mobile:board.noTasksHere'),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: context.colors.mutedForeground),
+                              ),
+                              const SizedBox(height: 8),
+                              TextButton.icon(
+                                key: ValueKey('add-task-empty-${column.slug}'),
+                                icon: const Icon(LucideIcons.plus, size: 16),
+                                label: Text(context.t('mobile:board.addTask')),
+                                onPressed: () => openNewTask(
+                                  context,
+                                  projectId: widget.board.id,
+                                  status: column.slug,
+                                ),
+                              ),
+                            ],
                           ),
                         )
                       : _CardTarget(
