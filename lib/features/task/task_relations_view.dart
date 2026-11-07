@@ -176,7 +176,7 @@ class _SubtasksState extends ConsumerState<_Subtasks> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _SectionHeader(
+        TaskSectionHeader(
           title: context.t('mobile:taskDetail.subtasks.title'),
           meta: subtasks.isEmpty ? null : _Progress(completed: done, total: subtasks.length),
           action: canAdd
@@ -248,7 +248,7 @@ class _SubtasksState extends ConsumerState<_Subtasks> {
             ),
           )
         else if (subtasks.isEmpty)
-          _EmptyText(context.t('mobile:taskDetail.subtasks.empty')),
+          TaskSectionNote(context.t('mobile:taskDetail.subtasks.empty')),
       ],
     );
   }
@@ -313,7 +313,7 @@ class _Links extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _SectionHeader(title: context.t('mobile:taskDetail.relations.title')),
+        TaskSectionHeader(title: context.t('mobile:taskDetail.relations.title')),
         for (final link in links)
           _TaskRow(
             key: ValueKey('task-link-${link.kind.name}-${link.task.id}'),
@@ -336,7 +336,7 @@ class _Links extends ConsumerWidget {
               ),
             ),
           ),
-        if (links.isEmpty) _EmptyText(context.t('mobile:taskDetail.relations.empty')),
+        if (links.isEmpty) TaskSectionNote(context.t('mobile:taskDetail.relations.empty')),
       ],
     );
   }
@@ -468,8 +468,8 @@ class _LinkTag extends StatelessWidget {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.meta, this.action});
+class TaskSectionHeader extends StatelessWidget {
+  const TaskSectionHeader({super.key, required this.title, this.meta, this.action});
 
   final String title;
   final Widget? meta;
@@ -498,8 +498,8 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _EmptyText extends StatelessWidget {
-  const _EmptyText(this.text);
+class TaskSectionNote extends StatelessWidget {
+  const TaskSectionNote(this.text, {super.key});
 
   final String text;
 

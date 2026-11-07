@@ -50,7 +50,11 @@ const _source =
 
 const _savePath = 'api/task/description/doc';
 
-final _box = find.descendant(of: find.byType(MarkdownField), matching: find.byType(TextField));
+final _description = find.byType(TaskDescription);
+final _box = find.descendant(
+  of: find.descendant(of: _description, matching: find.byType(MarkdownField)),
+  matching: find.byType(TextField),
+);
 
 List<String> _saves(FakeKaneo server, [String path = _savePath]) => [
   for (final request in server.requestsTo(path, method: 'PUT'))

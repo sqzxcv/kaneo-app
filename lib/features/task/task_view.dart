@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/core.dart';
+import 'task_activity_view.dart';
 import 'task_description.dart';
 import 'task_properties.dart';
 import 'task_relations_view.dart';
@@ -113,6 +114,7 @@ class _TaskBodyState extends State<_TaskBody> {
   final _title = GlobalKey();
   final _description = GlobalKey();
   final _relations = GlobalKey();
+  final _activity = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -122,6 +124,7 @@ class _TaskBodyState extends State<_TaskBody> {
     final properties = TaskProperties(task: task);
     final parent = TaskParentLink(task: task);
     final relations = TaskRelationSections(key: _relations, task: task);
+    final activity = TaskActivitySection(key: _activity, task: task);
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < taskTwoColumnsMinWidth) {
@@ -138,6 +141,8 @@ class _TaskBodyState extends State<_TaskBody> {
                 description,
                 const SizedBox(height: 24),
                 relations,
+                const SizedBox(height: 24),
+                activity,
               ],
             ),
           );
@@ -158,6 +163,8 @@ class _TaskBodyState extends State<_TaskBody> {
                       description,
                       const SizedBox(height: 28),
                       relations,
+                      const SizedBox(height: 28),
+                      activity,
                     ],
                   ),
                 ),

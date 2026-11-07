@@ -29,6 +29,44 @@ void main() {
     api = KaneoApi(client, i18n);
   });
 
+  group('comments', () {
+    test('only the author can change one', () async {
+      final theirs = server.addComment('task-1', 'Theirs', authorId: 'user-2');
+      await expectLater(api.updateComment(theirs['id'] as String, 'x'), throwsA(isA<ApiError>()));
+      await expectLater(api.deleteComment(theirs['id'] as String), throwsA(isA<ApiError>()));
+      expect(theirs['content'], 'Theirs');
+      expect(server.activities, contains(theirs));
+
+      final mine = server.addComment('task-1', 'Mine');
+      await api.updateComment(mine['id'] as String, 'Edited');
+      expect(mine['content'], 'Edited');
+      expect(mine['updatedAt'], isNot(mine['createdAt']));
+      await api.deleteComment(mine['id'] as String);
+      expect(server.activities, isNot(contains(mine)));
+    });
+
+    test('a mention notifies the other person, not the author', () async {
+      final before = (await api.notifications()).length;
+      await api.createComment(
+        'task-1',
+        '<kaneo-mention id="user-2" label="Second User"></kaneo-mention> '
+            '<kaneo-mention id="${FakeKaneo.userId}" label="Test User"></kaneo-mention>',
+      );
+      final notification = server.notificationsToOthers.single;
+      expect(notification['userId'], 'user-2');
+      expect(notification['type'], 'task_mention');
+      expect(notification['resourceId'], 'task-1');
+      expect(await api.notifications(), hasLength(before));
+    });
+
+    test('a change of status says what changed', () async {
+      await api.updateStatus('task-1', 'done');
+      final event = server.activities.first;
+      expect(event['type'], 'status_changed');
+      expect(event['eventData'], {'oldStatus': 'to-do', 'newStatus': 'done'});
+    });
+  });
+
   group('a second workspace', () {
     const other = 'other-workspace';
 

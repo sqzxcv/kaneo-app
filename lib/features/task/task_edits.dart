@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/misc.dart' show KeepAliveLink;
 
 import '../../core/core.dart';
 import '../board/board_data.dart';
+import 'task_activity.dart';
 import 'task_relations.dart';
 
 /// The labels on a task. Each is the task's own copy of a workspace label.
@@ -265,6 +266,34 @@ class TaskEdits {
     if (!saved) _showSubtaskDone(subtask.id, !done);
   }
 
+  /// Adds a comment. Like editing and deleting one, this resolves to whether it was saved, and says
+  /// why not otherwise. The task's activity has been read again by then, so it shows the result.
+  Future<bool> addComment(String text) => _changeComment((api) => api.createComment(taskId, text));
+
+  Future<bool> editComment(String activityId, String text) =>
+      _changeComment((api) => api.updateComment(activityId, text));
+
+  Future<bool> deleteComment(String activityId) =>
+      _changeComment((api) => api.deleteComment(activityId));
+
+  Future<bool> _changeComment(Future<void> Function(KaneoApi api) send) {
+    if (!_ref.mounted) return Future.value(false);
+    final saved = Completer<bool>();
+    final api = _ref.read(kaneoApiProvider);
+    _enqueue(() async {
+      try {
+        await send(api);
+      } catch (error) {
+        _report(error);
+        saved.complete(false);
+        return;
+      }
+      if (_ref.mounted) await _refreshIfOpen(taskActivitiesQuery(taskId));
+      saved.complete(true);
+    });
+    return saved.future;
+  }
+
   void _showSubtaskDone(String subtaskId, bool done) {
     if (!_ref.mounted) return;
     final query = taskRelationsQuery(taskId);
@@ -305,6 +334,8 @@ class TaskEdits {
       final task = _ref.read(taskQuery(taskId)).value;
       if (task != null) _publish(task.copyWith(status: status));
       _ref.read(savedTaskProvider.notifier).saved(taskId);
+      await _refreshIfOpen(taskActivitiesQuery(taskId));
+      if (!_ref.mounted) return;
       await _refreshIfOpen(boardQuery(projectId));
       if (workspaceId != null && _ref.mounted) {
         await _refreshIfOpen(assignedTasksQuery(workspaceId));
@@ -336,6 +367,9 @@ class TaskEdits {
       }
       if (!_ref.mounted) return;
       _ref.read(savedTaskProvider.notifier).saved(taskId);
+      // The server records the change, and the task's activity on screen should say so.
+      await _refreshIfOpen(taskActivitiesQuery(taskId));
+      if (!_ref.mounted) return;
       // The board shows a parent's progress, which depends on the status of its children.
       if (refreshBoard) await _refreshIfOpen(boardQuery(after.projectId));
       final workspaceId = after.workspaceId;

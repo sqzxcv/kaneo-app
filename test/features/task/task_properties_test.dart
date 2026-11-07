@@ -818,13 +818,16 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tapAt(tester.getTopLeft(find.byType(TaskDescription)) + const Offset(8, 8));
       await tester.pumpAndSettle();
-      final box = find.descendant(of: find.byType(MarkdownField), matching: find.byType(TextField));
+      final box = find.descendant(
+        of: find.descendant(of: find.byType(TaskDescription), matching: find.byType(MarkdownField)),
+        matching: find.byType(TextField),
+      );
       expect(tester.widget<TextField>(box).controller!.text, '**Bold** words');
       await tester.enterText(box, '**Bold** and new');
       FocusManager.instance.primaryFocus!.unfocus();
       await tester.pumpAndSettle();
       expect(_task(server)['description'], '**Bold** and new');
-      expect(find.byType(MarkdownField), findsNothing);
+      expect(box, findsNothing);
     });
   });
 

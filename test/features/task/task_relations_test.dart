@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kaneo_app/core/core.dart';
 import 'package:kaneo_app/features/task/task_panel.dart';
 import 'package:kaneo_app/features/task/task_relations.dart';
+import 'package:kaneo_app/features/task/task_relations_view.dart';
 
 import '../../support/test_app.dart';
 
@@ -727,13 +728,17 @@ void main() {
         settle: false,
       );
       await tester.pump(const Duration(milliseconds: 300));
+      final spinner = _in(
+        find.byType(TaskRelationSections),
+        find.byType(CircularProgressIndicator),
+      );
       expect(_title, findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(spinner, findsOneWidget);
       expect(_row('task-2'), findsNothing);
 
       gate.release();
       await tester.pumpAndSettle();
-      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(spinner, findsNothing);
       expect(_row('task-2'), findsOneWidget);
     });
 

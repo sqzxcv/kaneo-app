@@ -194,7 +194,10 @@ void main() {
       await tester.enterText(_title, 'Half a thought');
       await tester.tapAt(tester.getTopLeft(find.byType(TaskDescription)) + const Offset(8, 8));
       await tester.pumpAndSettle();
-      final box = find.descendant(of: find.byType(MarkdownField), matching: find.byType(TextField));
+      final box = find.descendant(
+        of: find.descendant(of: find.byType(TaskDescription), matching: find.byType(MarkdownField)),
+        matching: find.byType(TextField),
+      );
       await tester.enterText(box, 'Half a sentence');
 
       await _resize(tester, narrowSize);

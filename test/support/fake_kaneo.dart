@@ -132,6 +132,10 @@ class FakeKaneo implements HttpClientAdapter {
   final List<Map<String, dynamic>> customFieldValues = [];
   final List<Map<String, dynamic>> notifications = [];
 
+  /// What the server sent to other people, such as someone mentioned in a comment. They aren't in the
+  /// inbox of whoever is signed in.
+  final List<Map<String, dynamic>> notificationsToOthers = [];
+
   final List<_Route> _routes = [];
   final List<_Override> _overrides = [];
   final List<(FakeGate, Completer<void>)> _gates = [];
@@ -179,6 +183,7 @@ class FakeKaneo implements HttpClientAdapter {
     activities.clear();
     labels.clear();
     notifications.clear();
+    notificationsToOthers.clear();
   }
 
   /// Adds a project with Kaneo's four default columns.
@@ -282,8 +287,31 @@ class FakeKaneo implements HttpClientAdapter {
     return relation;
   }
 
-  Map<String, dynamic> addComment(String taskId, String content) =>
-      _logActivity(taskId, 'comment', content: content);
+  /// A comment by [authorId], by default the signed-in user. [externalSource] makes it an imported
+  /// one, where [externalUserName] wrote it and [authorId] imported it.
+  Map<String, dynamic> addComment(
+    String taskId,
+    String content, {
+    String authorId = userId,
+    String? externalUserName,
+    String? externalSource,
+  }) => _logActivity(
+    taskId,
+    'comment',
+    content: content,
+    authorId: authorId,
+    externalUserName: externalUserName,
+    externalSource: externalSource,
+  );
+
+  /// Something that happened on a task, as the server records it.
+  Map<String, dynamic> addActivity(
+    String taskId,
+    String type, {
+    String? content,
+    Map<String, Object?>? eventData,
+    String authorId = userId,
+  }) => _logActivity(taskId, type, content: content, eventData: eventData, authorId: authorId);
 
   Map<String, dynamic> addNotification({
     String type = 'task_assigned',
@@ -560,22 +588,37 @@ class FakeKaneo implements HttpClientAdapter {
   Map<String, dynamic> _find(List<Map<String, dynamic>> records, String id, String what) =>
       records.firstWhere((r) => r['id'] == id, orElse: () => throw _NotFound('$what not found'));
 
+  /// A comment of the signed-in user. The server treats anyone else's as not there.
+  Map<String, dynamic> _ownComment(String activityId) =>
+      activities
+          .where((a) => a['id'] == activityId && a['type'] == 'comment' && a['userId'] == userId)
+          .firstOrNull ??
+      (throw const _NotFound('Comment not found or you are not the author'));
+
   Map<String, dynamic> _member(String? id) =>
       members.firstWhere((m) => m['id'] == id, orElse: () => const {'name': null, 'image': null});
 
-  Map<String, dynamic> _logActivity(String taskId, String type, {String? content}) {
+  Map<String, dynamic> _logActivity(
+    String taskId,
+    String type, {
+    String? content,
+    Map<String, Object?>? eventData,
+    String authorId = userId,
+    String? externalUserName,
+    String? externalSource,
+  }) {
     final activity = <String, dynamic>{
       'id': _id('activity'),
       'taskId': taskId,
       'type': type,
       'createdAt': _now,
       'updatedAt': _now,
-      'userId': userId,
+      'userId': authorId,
       'content': content,
-      'eventData': type == 'comment' ? null : <String, Object?>{},
-      'externalUserName': null,
+      'eventData': eventData ?? (type == 'comment' ? null : <String, Object?>{}),
+      'externalUserName': externalUserName,
       'externalUserAvatar': null,
-      'externalSource': null,
+      'externalSource': externalSource,
       'externalUrl': null,
     };
     activities.insert(0, activity);
@@ -1177,8 +1220,13 @@ class FakeKaneo implements HttpClientAdapter {
     _route('PUT', 'api/task/description/:id', _setTaskField('description'));
     _route('PUT', 'api/task/status/:id', (request, params) {
       final task = _find(tasks, params[0], 'Task');
+      final oldStatus = task['status'];
       task['status'] = _body(request)['status'];
-      _logActivity(task['id'] as String, 'status_changed');
+      _logActivity(
+        task['id'] as String,
+        'status_changed',
+        eventData: {'oldStatus': oldStatus, 'newStatus': task['status']},
+      );
       return _taskDetail(task);
     });
     _route('PUT', 'api/task/priority/:id', _setTaskField('priority'));
@@ -1350,16 +1398,45 @@ class FakeKaneo implements HttpClientAdapter {
     });
     _route('POST', 'api/activity/comment', (request, params) {
       final body = _body(request);
-      _find(tasks, body['taskId'] as String, 'Task');
-      return addComment(body['taskId'] as String, body['comment'] as String);
+      final taskId = body['taskId'] as String;
+      final content = body['comment'] as String;
+      final task = _find(tasks, taskId, 'Task');
+      final comment = addComment(taskId, content);
+      // The server only notifies when a comment is created, and never the author.
+      final mentioned = RegExp(
+        r'<kaneo-mention[^>]*\bid="([^"]+)"',
+        caseSensitive: false,
+      ).allMatches(content).map((match) => match[1]!).toSet()..remove(userId);
+      for (final id in mentioned) {
+        notificationsToOthers.add({
+          'id': _id('notification'),
+          'userId': id,
+          'title': null,
+          'content': null,
+          'type': 'task_mention',
+          'eventData': {
+            'taskTitle': task['title'],
+            'mentionerName': _member(userId)['name'],
+            'projectId': task['projectId'],
+            'workspaceId': workspaceId,
+          },
+          'isRead': false,
+          'resourceId': taskId,
+          'resourceType': 'task',
+          'createdAt': _now,
+          'updatedAt': _now,
+        });
+      }
+      return comment;
     });
     _route('PUT', 'api/activity/comment', (request, params) {
       final body = _body(request);
-      return _find(activities, body['activityId'] as String, 'Comment')
-        ..['content'] = body['comment'];
+      return _ownComment(body['activityId'] as String)
+        ..['content'] = body['comment']
+        ..['updatedAt'] = DateTime.utc(2026, 11, 6, 13).toIso8601String();
     });
     _route('DELETE', 'api/activity/comment', (request, params) {
-      final comment = _find(activities, _body(request)['activityId'] as String, 'Comment');
+      final comment = _ownComment(_body(request)['activityId'] as String);
       activities.remove(comment);
       return comment;
     });

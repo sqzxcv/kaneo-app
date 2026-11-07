@@ -13,19 +13,24 @@ import 'markdown_view.dart';
 ///   make Chinese candidates repeat.
 /// - Suggestions stay on, because turning them off gives Android a password keyboard with no Chinese.
 ///
-/// Never set [controller]'s value while this is on screen, for the same reason.
+/// Never set [controller]'s value as a result of typing, for the same reason. Only something the
+/// person asked for by pressing a button may do that, such as inserting a mention.
 class MarkdownField extends StatelessWidget {
   const MarkdownField({
     super.key,
     required this.controller,
     required this.focusNode,
     this.autofocus = false,
+    this.readOnly = false,
+    this.minLines = 4,
     this.hintText,
   });
 
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool autofocus;
+  final bool readOnly;
+  final int minLines;
   final String? hintText;
 
   @override
@@ -39,8 +44,9 @@ class MarkdownField extends StatelessWidget {
       controller: controller,
       focusNode: focusNode,
       autofocus: autofocus,
+      readOnly: readOnly,
       style: style,
-      minLines: 4,
+      minLines: minLines,
       maxLines: null,
       keyboardType: TextInputType.multiline,
       textInputAction: TextInputAction.newline,
