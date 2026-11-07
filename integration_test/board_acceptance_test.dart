@@ -473,6 +473,15 @@ void main() {
     if (find.byTooltip('List view').evaluate().isNotEmpty) {
       await tap(tester, find.byTooltip('List view'));
     }
+    // Returning to this project restores the previous list scroll position.
+    final returnedList = find
+        .descendant(
+          of: find.byKey(PageStorageKey('board-list-${project.id}')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await see(tester, returnedList);
+    tester.state<ScrollableState>(returnedList).position.jumpTo(0);
     await see(tester, row(parent.id));
 
     debugPrint('B_CHECK reopen');
