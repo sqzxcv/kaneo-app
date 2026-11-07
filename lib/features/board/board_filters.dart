@@ -2,6 +2,19 @@ import 'package:kaneo_app/core/core.dart';
 
 const unassignedBoardFilter = '__unassigned__';
 
+/// The API stores a separate label row for each task. Names identify a workspace label group;
+/// exposing every copy's ID would show duplicate options and match just one task.
+List<Label> boardFilterLabels(Iterable<Label> labels) {
+  final byName = <String, Label>{};
+  for (final label in labels) {
+    byName.putIfAbsent(
+      label.name,
+      () => Label(id: label.name, name: label.name, color: label.color),
+    );
+  }
+  return byName.values.toList()..sort((a, b) => a.name.compareTo(b.name));
+}
+
 class BoardFilters {
   const BoardFilters({
     this.text = '',
@@ -13,6 +26,8 @@ class BoardFilters {
   final String text;
   final Set<String> assignees;
   final Set<String> priorities;
+
+  /// Selected label names, shared by all per-task copies in the workspace.
   final Set<String> labels;
   final bool overdue;
   int get count =>
@@ -50,7 +65,7 @@ class BoardFilters {
       return false;
     }
     if (priorities.isNotEmpty && !priorities.contains(task.priority ?? 'no-priority')) return false;
-    if (labels.isNotEmpty && !(task.labels ?? <TaskLabel>[]).any((l) => labels.contains(l.id))) {
+    if (labels.isNotEmpty && !(task.labels ?? <TaskLabel>[]).any((l) => labels.contains(l.name))) {
       return false;
     }
     return !overdue || isOverdue(task.dueDate, now: now);

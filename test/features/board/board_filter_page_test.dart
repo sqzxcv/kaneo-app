@@ -79,6 +79,28 @@ void main() {
     expect(tester.widget<Text>(find.byKey(const ValueKey('filter-count'))).data, '3');
   });
 
+  testBothLayouts('one label option matches every per-task copy from the API', (
+    tester,
+    size,
+  ) async {
+    final server = FakeKaneo()..relations.clear();
+    server.addLabel('B Shared label');
+    server.addLabel('B Shared label', taskId: 'task-1');
+    server.addLabel('B Shared label', taskId: 'task-3');
+    await pumpKaneoApp(
+      tester,
+      server: server,
+      size: size,
+      location: AppRoutes.board(FakeKaneo.projectId),
+    );
+    await filterMenu(tester, 'Labels');
+    expect(find.widgetWithText(CheckboxListTile, 'B Shared label'), findsOneWidget);
+    await checkOption(tester, 'B Shared label');
+    expect(find.byKey(const ValueKey('board-card-task-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('board-card-task-3')), findsOneWidget);
+    expect(find.byKey(const ValueKey('board-card-task-2')), findsNothing);
+    expect(tester.widget<Text>(find.byKey(const ValueKey('filter-count'))).data, '1');
+  });
   testBothLayouts('assignee multi-select includes unassigned and me shortcut', (
     tester,
     size,

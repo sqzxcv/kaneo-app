@@ -177,13 +177,15 @@ void main() {
     final completed = await create('B Completed child', status: done);
     final cycleA = await create('B Cycle A');
     final cycleB = await create('B Cycle B');
+    final cycleC = await create('B Cycle C');
     await api.createRelation(parent.id, child.id, 'subtask');
     await api.createRelation(child.id, grandchild.id, 'subtask');
     await api.createRelation(parent.id, cross.id, 'subtask');
     await api.createRelation(parent.id, completed.id, 'subtask');
     await api.createRelation(target.id, child.id, 'subtask');
     await api.createRelation(cycleA.id, cycleB.id, 'subtask');
-    await api.createRelation(cycleB.id, cycleA.id, 'subtask');
+    await api.createRelation(cycleB.id, cycleC.id, 'subtask');
+    await api.createRelation(cycleC.id, cycleA.id, 'subtask');
     final label = await api.createLabel(
       name: 'B-acceptance-$stamp',
       color: 'red',
@@ -226,8 +228,8 @@ void main() {
       find.descendant(of: card(cross.id), matching: find.text('Parent task: B Parent')),
       findsOneWidget,
     );
-    final header = find.byKey(ValueKey('column-header-${columns.first.id}'));
-    expect(find.descendant(of: header, matching: find.text('107 tasks')), findsOneWidget);
+    final header = find.byKey(ValueKey('column-header-${columns.first.slug}'));
+    expect(find.descendant(of: header, matching: find.text('108 tasks')), findsOneWidget);
     await shot(tester, '01-board-collapsed');
     final firstPosition = tester.getTopLeft(card(parent.id));
     await tap(tester, find.byKey(ValueKey('expand-task-${parent.id}')));
@@ -238,7 +240,7 @@ void main() {
     await tap(tester, find.byKey(ValueKey('expand-task-${parent.id}')));
 
     debugPrint('B_CHECK drag');
-    final lane = find.byKey(PageStorageKey('column-tasks-${columns.first.id}'));
+    final lane = find.byKey(PageStorageKey('column-tasks-${columns.first.slug}'));
     final headerBefore = tester.getTopLeft(header);
     final targetRect = tester.getRect(find.byKey(ValueKey('drop-card-${target.id}')));
     await dragTo(
@@ -251,7 +253,7 @@ void main() {
     final storedMoved = await api.task(moving.id);
     final storedTarget = await api.task(target.id);
     expect(storedMoved.position!, lessThan(storedTarget.position!));
-    final nextHeader = find.byKey(ValueKey('column-header-${columns[1].id}'));
+    final nextHeader = find.byKey(ValueKey('column-header-${columns[1].slug}'));
     await dragTo(tester, parent.id, tester.getTopLeft(nextHeader) + const Offset(20, 20));
     expect(
       find.descendant(of: find.byKey(ValueKey('drop-column-$doing')), matching: card(parent.id)),

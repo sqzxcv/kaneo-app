@@ -182,7 +182,7 @@ class _BoardToolbarState extends ConsumerState<BoardToolbar> {
           if (!mounted || !anchor.mounted || labels == null) return;
           final selected = await pickLabels(
             anchor,
-            labels: labels,
+            labels: boardFilterLabels(labels),
             selectedIds: widget.filters.labels,
           );
           if (mounted && selected != null) {

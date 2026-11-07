@@ -27,7 +27,7 @@ void main() {
       text: 'fix',
       assignees: {'u', 'v'},
       priorities: {'low', 'high'},
-      labels: {'bug', 'other'},
+      labels: {'Bug', 'other'},
       overdue: true,
     );
     expect(filters.count, 8);
@@ -45,6 +45,23 @@ void main() {
       isTrue,
     );
     expect(const BoardFilters(text: '   ').active, isFalse);
+  });
+  test('label filters group distinct server IDs by the shared name', () {
+    final labels = boardFilterLabels([
+      const Label(id: 'workspace-label', name: 'Bug', color: 'red'),
+      const Label(id: 'task-label', name: 'Bug', color: 'red', taskId: 'a'),
+    ]);
+    expect(labels.length, 1);
+    expect(labels.single.id, 'Bug');
+    expect(const BoardFilters(labels: {'Bug'}).matches(task), isTrue);
+    expect(
+      const BoardFilters(labels: {'Bug'}).matches(
+        task.copyWith(
+          labels: [const TaskLabel(id: 'another-task-copy', name: 'Bug', color: 'red')],
+        ),
+      ),
+      isTrue,
+    );
   });
   test('collections expand without duplicating real statuses and collapse losslessly', () {
     final raw = BoardData(
