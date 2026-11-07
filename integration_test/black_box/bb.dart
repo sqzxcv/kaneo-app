@@ -213,10 +213,11 @@ void bbCase(
       if (sharedItems.isNotEmpty) bb.note('shared: $sharedItems');
       final error = tester.takeException();
       if (error != null) throw StateError('The app reported an error: $error');
+      final why = unverified ?? bb.unverified;
       await record(
         id,
-        unverified != null ? 'unverified' : (simulated == null ? 'pass' : 'pass-simulated'),
-        note: [?unverified, ?simulated, ...bb.notes].join('; '),
+        why != null ? 'unverified' : (simulated == null ? 'pass' : 'pass-simulated'),
+        note: [?why, ?simulated, ...bb.notes].join('; '),
         evidence: bb.shots,
       );
     } catch (error) {
@@ -250,6 +251,9 @@ class Bb {
   ProviderContainer? _container;
   SessionStorage? storage;
 
+  /// Set when part of the case can't be verified on this machine, with the reason.
+  String? unverified;
+
   void note(String text) {
     notes.add(text);
     debugPrint('BB_NOTE $id $text');
@@ -278,6 +282,7 @@ class Bb {
         SharePlatform.instance is! _RecordingShare) {
       throw StateError('Links or sharing would leave the app; stopping before anything opens');
     }
+    if (isPhone) await _upright();
     await tester.pumpWidget(
       RepaintBoundary(
         key: _capture,
@@ -288,6 +293,18 @@ class Bb {
       if (_container == container) await stop();
     });
     await pumpFor(const Duration(milliseconds: 500));
+  }
+
+  /// A simulator has no hand holding it: once an app has turned it sideways it stays so. Each
+  /// launch starts it upright again, as a person holding a phone would.
+  Future<void> _upright() async {
+    if (!landscape) return;
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    for (var i = 0; i < 40 && landscape; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await SystemChrome.setPreferredOrientations(const []);
+    await tester.pump(const Duration(milliseconds: 300));
   }
 
   /// Takes the app away, as when it's killed. The session store and preferences stay.
@@ -312,7 +329,7 @@ class Bb {
     await tap(find.text('Email and password'));
     await type(field('Email'), account.email);
     await type(field('Password'), account.password);
-    await tap(find.widgetWithText(FilledButton, 'Sign in').hitTestable());
+    await tap(find.widgetWithText(FilledButton, 'Sign in'));
     if (expectHome) await waitHome();
   }
 
@@ -321,7 +338,7 @@ class Bb {
     await type(field('Server address'), server ?? Env.server);
     await tap(find.text('API key'));
     await type(field('API key'), key);
-    await tap(find.widgetWithText(FilledButton, 'Sign in').hitTestable());
+    await tap(find.widgetWithText(FilledButton, 'Sign in'));
     if (expectHome) await waitHome();
   }
 
@@ -653,6 +670,22 @@ class Bb {
     return [for (final (_, t) in found) t];
   }
 
+  /// Types into the board's filter field, opening it first where a narrow toolbar folds it away.
+  Future<void> typeFilter(String text) async {
+    final field = this.field('Filter tasks…');
+    if (!showing(field) && visible(tip('Filter tasks…'))) {
+      await tap(tip('Filter tasks…').hitTestable());
+    }
+    await type(field, text);
+  }
+
+  /// The filter field's text, or empty when the field is folded away.
+  String filterText() {
+    final field = this.field('Filter tasks…');
+    if (!showing(field)) return '';
+    return tester.widget<TextField>(field.first).controller?.text ?? '';
+  }
+
   /// The board's horizontal scroll view.
   Finder get boardScroll => find
       .byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right)
@@ -682,7 +715,7 @@ class Bb {
     await nav('Home');
     final card = label(RegExp('^${RegExp.escape(name)}\\n'));
     await see(card, seconds: 30);
-    await tap(card.hitTestable());
+    await tap(card);
     await see(filtersButton, seconds: 30);
   }
 
@@ -722,6 +755,8 @@ class Bb {
     image.dispose();
     final directory = await evidenceDirectory();
     final file = File('${directory.path}/$id-$name.png');
+    // The evidence folder may not tell upper from lower case: replace what is there.
+    if (await file.exists()) await file.delete();
     await file.writeAsBytes(bytes!.buffer.asUint8List());
     shots.add('$device/$id-$name.png');
     debugPrint('BB_SHOT ${file.path}');

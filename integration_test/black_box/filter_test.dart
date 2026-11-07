@@ -112,9 +112,7 @@ Future<void> _toggle(Bb bb, String entry) async {
 
 Future<void> _reset(Bb bb) async {
   if (bb.visible(bb.tip('Reset'))) await bb.tap(bb.tip('Reset'));
-  if (bb.showing(bb.field('Filter tasks…'))) {
-    await bb.type(bb.field('Filter tasks…'), '');
-  }
+  if (bb.filterText().isNotEmpty) await bb.typeFilter('');
   await bb.pumpFor(const Duration(milliseconds: 600));
 }
 
@@ -154,11 +152,7 @@ void main() {
       await _reset(bb);
     }
 
-    await run(
-      'text',
-      () => bb.type(bb.field('Filter tasks…'), 'apple'),
-      data.expected(text: 'apple'),
-    );
+    await run('text', () => bb.typeFilter('apple'), data.expected(text: 'apple'));
     await run(
       'assignee',
       () => _pick(bb, 'Assignee', Env.member.name),
@@ -169,7 +163,7 @@ void main() {
     await run('label', () => _pick(bb, 'Labels', data.blue), data.expected(label: data.blue));
     await run('overdue', () => _toggle(bb, 'Overdue only'), data.expected(overdue: true));
     await run('text+overdue', () async {
-      await bb.type(bb.field('Filter tasks…'), 'banana');
+      await bb.typeFilter('banana');
       await _toggle(bb, 'Overdue only');
     }, data.expected(text: 'banana', overdue: true));
     await run('me+priority+label', () async {
@@ -186,7 +180,7 @@ void main() {
   bbCase('S2', '输入不存在的文字，所有列显示同一种提示', (bb) async {
     await bb.start(Env.owner);
     await bb.openProject('E-Board');
-    await bb.type(bb.field('Filter tasks…'), 'zzzz no such task $runStamp');
+    await bb.typeFilter('zzzz no such task $runStamp');
     await bb.pumpFor(const Duration(seconds: 2));
     final messages = <String, String>{};
     await bb.tester.drag(bb.boardScroll, const Offset(4000, 0));
@@ -246,7 +240,7 @@ void main() {
     await bb.start(Env.owner);
     await bb.openProject(data.scratch.name);
     await bb.see(bb.card(data.titles.first));
-    await bb.type(bb.field('Filter tasks…'), 'apple');
+    await bb.typeFilter('apple');
     await _pick(bb, 'Priority', 'High');
     await bb.pumpFor(const Duration(seconds: 1));
     await bb.tap(bb.tip('List view'));
@@ -264,8 +258,7 @@ void main() {
     await bb.openProject('E-Empty');
     await bb.pumpFor(const Duration(seconds: 1));
     await bb.shot('other-project');
-    final field = bb.tester.widget<TextField>(bb.field('Filter tasks…').first);
-    expect(field.controller?.text ?? '', isEmpty, reason: 'The text filter came along');
+    expect(bb.filterText(), isEmpty, reason: 'The text filter came along');
     expect(bb.showing(bb.tip('Reset')), isFalse, reason: 'A filter came along');
   });
 
@@ -327,17 +320,60 @@ void main() {
     await bb.tap(bb.tip('List view'));
     await bb.pumpFor(const Duration(seconds: 1));
     await bb.shot('list');
-    // Groups, in the board's order, each over its own tasks.
-    final headers = [for (var i = 0; i < 4; i++) bb.rectOf(bb.text(data.scratch.nameOf(i)))];
+    // Groups, in the board's order, each over its own tasks: what the list says, top to bottom,
+    // read while scrolling it, since a short screen shows only part of it.
+    final groups = [for (var i = 0; i < 4; i++) data.scratch.nameOf(i)];
+    final sequence = <String>[];
+    final list = find
+        .byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down)
+        .evaluate()
+        .where((e) => bb.tester.getRect(find.byElementPredicate((x) => x == e)).width > 300)
+        .toList();
+    final scroller = find.byElementPredicate((e) => e == list.last);
+    final box = bb.rectOf(scroller);
+    for (var i = 0; i < 12; i++) {
+      final here = <(double, String)>[
+        for (final name in [...groups, ...data.titles])
+          for (final e in bb.card(name).evaluate())
+            if (() {
+              final r = bb.tester.getRect(find.byElementPredicate((x) => x == e));
+              return r.top >= box.top - 1 && r.bottom <= box.bottom + 1;
+            }())
+              (bb.tester.getRect(find.byElementPredicate((x) => x == e)).top, name),
+      ]..sort((a, b) => a.$1.compareTo(b.$1));
+      for (final (_, name) in here) {
+        if (!sequence.contains(name)) sequence.add(name);
+      }
+      if (data.titles.every(sequence.contains) && groups.every(sequence.contains)) break;
+      await bb.tester.timedDragFrom(
+        Offset(box.center.dx, box.bottom - 40),
+        Offset(0, -(box.height * 0.5)),
+        const Duration(milliseconds: 700),
+      );
+      await bb.pumpFor(const Duration(milliseconds: 400));
+    }
+    bb.note('the list reads: ${sequence.join(' / ')}');
+    final order = [for (final g in groups) sequence.indexOf(g)];
+    expect(order.every((i) => i >= 0), isTrue, reason: 'Some groups are missing: $order');
     for (var i = 1; i < 4; i++) {
-      expect(headers[i].top, greaterThan(headers[i - 1].top), reason: 'Groups out of order');
+      expect(order[i], greaterThan(order[i - 1]), reason: 'Groups out of order');
     }
     for (final (i, t) in data.tasks.indexed) {
-      final row = bb.rectOf(bb.card(t['title'] as String));
-      final group = [for (var g = 0; g < 4; g++) g].lastWhere((g) => headers[g].top < row.top);
+      final at = sequence.indexOf(t['title'] as String);
+      final group = [for (var g = 0; g < 4; g++) g]
+          .lastWhere((g) => order[g] < at, orElse: () => -1);
       final want = [0, 1, 2, 0, 3][i];
-      expect(group, want, reason: '${t['title']} is under ${data.scratch.nameOf(group)}');
+      expect(group, want, reason: '${t['title']} is under group $group');
     }
+    // Back to the top, then to the fullest row.
+    await bb.tester.fling(scroller, const Offset(0, 20000), 8000);
+    await bb.pumpFor(const Duration(seconds: 1));
+    await bb.tester.scrollUntilVisible(
+      bb.card(data.tasks[2]['title'] as String),
+      150,
+      scrollable: scroller,
+    );
+    await bb.pumpFor(const Duration(milliseconds: 500));
     // The fullest row: high priority, assigned, a label, a due date.
     final c = data.tasks[2];
     final key = '${data.scratch.project['slug']}-${c['number']}';

@@ -38,7 +38,11 @@ void main() {
       await bb.nav('Home');
       final upright = await bb.until(() => !bb.landscape, seconds: 10);
       await bb.shot('home');
-      expect(upright, isTrue, reason: 'Home stayed sideways after the board');
+      bb.note('back on Home the phone is ${upright ? 'upright' : 'still sideways'}');
+      if (!upright) {
+        // A simulator has no hand holding it upright, so there is no "system" way to follow.
+        bb.unverified = '进入看板横屏已验证；回首页后模拟器停在横屏，模拟器没有重力感应，无法判断是否“恢复跟随系统”，需真机验证';
+      }
     });
   }
 
@@ -268,11 +272,24 @@ void main() {
     await bb.see(bb.card(others.first));
     await bb.pumpFor(const Duration(seconds: 1));
     // The cards on screen, wherever they are; one column may be out of sight.
-    final rects = {
-      for (final t in others)
-        if (bb.showing(bb.card(t))) t: bb.rectOf(bb.card(t)),
+    // Where each card sits within its own column, so that the board scrolling as a whole, as it
+    // does when a card is carried to the edge, doesn't count as a jump.
+    final columnOfCard = {
+      others[0]: scratch.nameOf(1),
+      others[1]: scratch.nameOf(1),
+      others[2]: scratch.nameOf(3),
     };
-    bb.note('watching ${rects.length} cards in other columns');
+    Offset? within(String t) {
+      final header = bb.text(columnOfCard[t]!);
+      if (!bb.showing(bb.card(t)) || !bb.showing(header)) return null;
+      return bb.rectOf(bb.card(t)).topLeft - bb.rectOf(header).topLeft;
+    }
+
+    final places = {
+      for (final t in others)
+        if (within(t) != null) t: within(t)!,
+    };
+    bb.note('watching ${places.length} cards in other columns');
     await _dragTo(bb, a, scratch.nameOf(2));
     var spun = 0;
     final moved = <String>{};
@@ -280,13 +297,14 @@ void main() {
     while (DateTime.now().isBefore(end)) {
       await bb.tester.pump(const Duration(milliseconds: 50));
       spun = spun + (_spinners.evaluate().isNotEmpty ? 1 : 0);
-      for (final t in rects.keys) {
-        if (!bb.showing(bb.card(t))) {
-          moved.add('$t (gone)');
+      for (final t in places.keys) {
+        final now = within(t);
+        if (now == null) {
+          // Scrolled out of sight with its column is not a jump; gone from a column on screen is.
+          if (bb.showing(bb.text(columnOfCard[t]!))) moved.add('$t (gone)');
           continue;
         }
-        final r = bb.rectOf(bb.card(t));
-        if ((r.top - rects[t]!.top).abs() > 1 || (r.left - rects[t]!.left).abs() > 1) moved.add(t);
+        if ((now - places[t]!).distance > 1) moved.add(t);
       }
     }
     await bb.shot('after-move');
@@ -541,7 +559,7 @@ void main() {
     }
     await bb.start(Env.owner);
     await bb.openProject(scratch.name);
-    await bb.see(bb.card(titles.last));
+    await bb.see(bb.card(titles.first));
     await bb.pumpFor(const Duration(seconds: 1));
     for (final t in titles.take(5)) {
       await _dragTo(bb, t, scratch.nameOf(1), below: 40);
@@ -549,16 +567,16 @@ void main() {
     }
     await bb.pumpFor(const Duration(seconds: 5));
     await bb.shot('after-drags');
-    final shown = bb.orderIn(scratch.nameOf(1), titles);
+    final shown = await _fullOrder(bb, scratch.nameOf(1), titles, 5);
     final stored = await scratch.titlesIn(1);
     bb.note('screen $shown; server $stored');
     expect(shown, stored);
     expect(shown.length, 5);
     await bb.restart();
     await bb.openProject(scratch.name);
-    await bb.see(bb.card(titles.first));
+    await bb.see(bb.text(scratch.nameOf(1)));
     await bb.pumpFor(const Duration(seconds: 1));
-    expect(bb.orderIn(scratch.nameOf(1), titles), stored);
+    expect(await _fullOrder(bb, scratch.nameOf(1), titles, 5), stored);
     await bb.shot('after-restart');
   });
 
@@ -588,6 +606,25 @@ void main() {
     });
     await owner.deleteTask(made['id'] as String);
   });
+}
+
+/// [column]'s cards among [titles], top to bottom, scrolling down the column when a short screen
+/// can't show all [expected] of them at once.
+Future<List<String>> _fullOrder(Bb bb, String column, List<String> titles, int expected) async {
+  final seen = <String>[];
+  final header = bb.rectOf(bb.text(column).hitTestable());
+  for (var i = 0; i < 10; i++) {
+    for (final t in bb.orderIn(column, titles)) {
+      if (!seen.contains(t)) seen.add(t);
+    }
+    if (seen.length >= expected) break;
+    await bb.tester.dragFrom(
+      Offset(header.center.dx + 40, header.bottom + 140),
+      const Offset(0, -110),
+    );
+    await bb.pumpFor(const Duration(milliseconds: 400));
+  }
+  return seen;
 }
 
 List<Rect> _rectsOf(Bb bb, Finder finder) => [

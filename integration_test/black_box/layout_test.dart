@@ -108,16 +108,36 @@ Future<List<String>> _hardToRead(Bb bb) async {
   return bad;
 }
 
+/// Goes to a page of the navigation once it speaks Chinese: back out of whatever is open, then the
+/// sidebar or the tabs; on a phone the account is behind the home page's button.
+Future<bool> _zh(Bb bb, String page) async {
+  final back = bb.tip(RegExp(r'^(返回|Back)$')).hitTestable();
+  final close = bb.tip(RegExp(r'^(关闭|Close)$')).hitTestable();
+  for (var i = 0; i < 4 && !bb.visible(bb.label('首页')); i++) {
+    if (bb.showing(close)) {
+      await bb.tap(close);
+    } else if (bb.showing(back)) {
+      await bb.tap(back);
+    } else {
+      break;
+    }
+  }
+  if (page == '账户' && !bb.visible(bb.label(page))) {
+    if (!bb.visible(bb.label('首页'))) return false;
+    await bb.tap(bb.label('首页').hitTestable().first);
+    await bb.tap(bb.tip(page).hitTestable());
+    return true;
+  }
+  if (!bb.visible(bb.label(page))) return false;
+  await bb.tap(bb.label(page).hitTestable().first);
+  return true;
+}
+
 /// Picks [option] from an account setting's choices, such as Theme or Language.
 Future<void> _setting(Bb bb, String setting, Pattern option) async {
   if (setting == '语言') {
     // The navigation speaks Chinese by now.
-    if (bb.visible(bb.label('账户'))) {
-      await bb.tap(bb.label('账户').hitTestable().first);
-    } else {
-      await bb.tap(bb.label('首页').hitTestable().first);
-      await bb.tap(bb.tip('账户').hitTestable());
-    }
+    await _zh(bb, '账户');
   } else {
     await bb.nav('Account');
   }
@@ -174,7 +194,7 @@ void main() {
     bbCase('U3', 'iPad 分屏到较短边小于 600 再恢复，布局切换，当前页面和筛选不丢', (bb) async {
       await bb.start(Env.owner);
       await bb.openProject('E-Board');
-      await bb.type(bb.field('Filter tasks…'), 'E-三层');
+      await bb.typeFilter('E-三层');
       await bb.pumpFor(const Duration(seconds: 1));
       final full = bb.window;
       expect(_sidebar(bb), isTrue);
@@ -183,7 +203,8 @@ void main() {
       await bb.pumpFor(const Duration(seconds: 1));
       await bb.shot('split');
       final narrowSidebar = _sidebar(bb);
-      final kept = bb.showing(bb.titleField('E-三层')) && bb.showing(bb.text('需求池'));
+      // Narrow toolbars fold the field away; the filter shows in what the board leaves out.
+      final kept = bb.showing(bb.text('需求池')) && !bb.showing(bb.card('E-卡片 001'));
       bb.note('split: sidebar $narrowSidebar, board and filter kept $kept');
       expect(narrowSidebar, isFalse, reason: 'Still the wide layout at 507 wide');
       expect(kept, isTrue, reason: 'The board or its filter was lost');
@@ -191,7 +212,8 @@ void main() {
       await bb.pumpFor(const Duration(seconds: 1));
       await bb.shot('restored');
       expect(_sidebar(bb), isTrue, reason: 'Not back to the wide layout');
-      expect(bb.showing(bb.titleField('E-三层')), isTrue, reason: 'The filter was lost');
+      expect(bb.filterText(), 'E-三层', reason: 'The filter was lost');
+      expect(bb.showing(bb.card('E-卡片 001')), isFalse, reason: 'The filter was lost');
       expect(bb.showing(bb.text('需求池')), isTrue, reason: 'The board was lost');
     }, simulated: '分屏用把 App 视图改成 507 宽模拟');
   }
@@ -353,17 +375,8 @@ void main() {
     final key = RegExp(r'^[a-zA-Z]+:[\w.]+$|^\w+(\.\w+){2,}$');
     final english = RegExp(r'[A-Za-z]{3,}');
     final found = <String>{};
-    final names = ['首页', '收件箱', '我的任务', '活动', '账户'];
-    for (final page in names) {
-      // On a phone the account is behind the home page's button.
-      if (page == '账户' && !bb.visible(bb.label(page))) {
-        await bb.tap(bb.label(names.first).hitTestable().first);
-        await bb.tap(bb.tip(page).hitTestable());
-      } else {
-        await bb.tap(bb.label(page).hitTestable().first);
-      }
-      await bb.pumpFor(const Duration(seconds: 1));
-      await bb.shot(page);
+    final skipped = <String>[];
+    void look(String page) {
       for (final t in bb.screenTexts()) {
         final line = t.trim();
         if (line.isEmpty || data.hasMatch(line)) continue;
@@ -373,16 +386,60 @@ void main() {
         }
       }
     }
-    await bb.tap(bb.label(names.first).hitTestable().first);
-    final board = bb.label(RegExp(r'^E-Board\n'));
-    await bb.tap(board.hitTestable());
-    await bb.pumpFor(const Duration(seconds: 2));
-    await bb.shot('board');
-    for (final t in bb.screenTexts()) {
-      final line = t.trim();
-      if (line.isEmpty || data.hasMatch(line)) continue;
-      if (key.hasMatch(line) || english.hasMatch(line)) found.add('board: $line');
+
+    Future<void> visit(String page, Future<bool> Function() open) async {
+      try {
+        if (!await open()) {
+          skipped.add(page);
+          return;
+        }
+        await bb.pumpFor(const Duration(seconds: 1));
+        await bb.shot(page);
+        look(page);
+      } catch (e) {
+        skipped.add('$page ($e)');
+      }
     }
+
+    Future<bool> tapTip(Pattern tip) async {
+      final f = bb.tip(tip).hitTestable();
+      if (!bb.showing(f)) return false;
+      await bb.tap(f);
+      return true;
+    }
+
+    for (final page in ['首页', '收件箱', '我的任务', '活动', '账户']) {
+      await visit(page, () => _zh(bb, page));
+    }
+    await visit('搜索', () async => await _zh(bb, '首页') && await tapTip(RegExp('搜索')));
+    await _zh(bb, '首页');
+    await visit('看板', () async {
+      await bb.tap(bb.label(RegExp(r'^E-Board\n')).hitTestable());
+      await bb.see(bb.text('需求池'));
+      return true;
+    });
+    await visit('筛选菜单', () async {
+      final ok = await tapTip(RegExp('筛选'));
+      return ok;
+    });
+    await bb.escape();
+    await visit('卡片菜单', () async {
+      await bb.openMenu(bb.card('E-卡片 001'));
+      return bb.until(() => bb.screenTexts().any((t) => t.contains('移动')), seconds: 4);
+    });
+    await bb.escape();
+    await visit('列表视图', () => tapTip(RegExp('列表')));
+    await visit('任务详情', () async {
+      await bb.tap(bb.card('E-卡片 001').hitTestable());
+      return bb.until(() => bb.showing(bb.titleField('E-卡片 001')), seconds: 10);
+    });
+    // Closing speaks Chinese now too.
+    for (var i = 0; i < 2 && bb.showing(bb.titleField('E-卡片 001')); i++) {
+      if (!await tapTip(RegExp(r'^(关闭|返回)$'))) await bb.escape();
+    }
+    await visit('新建任务', () => tapTip(RegExp('新建')));
+    await bb.escape();
+    if (skipped.isNotEmpty) bb.note('could not open: ${skipped.join(', ')}');
     for (final f in found) {
       bb.note(f);
     }

@@ -137,11 +137,11 @@ void main() {
     await bb.see(bb.containing(marker), seconds: 20);
     await signOut(bb);
     await bb.signIn(Env.member);
-    await bb.shot('member-home');
+    await bb.shot('member-signed-in');
     for (final page in ['Inbox', 'My tasks', 'Home']) {
       await bb.nav(page);
       await bb.pumpFor(const Duration(seconds: 3));
-      await bb.shot('member-${page.replaceAll(' ', '-')}');
+      await bb.shot('as-member-${page.replaceAll(' ', '-').toLowerCase()}');
       expect(
         bb.showing(bb.containing(marker)),
         isFalse,

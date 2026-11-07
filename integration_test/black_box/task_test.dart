@@ -69,9 +69,20 @@ void main() {
       await bb.openCard(title);
       await bb.pumpFor(const Duration(seconds: 1));
       await bb.shot('page');
+      // A page of its own: a way back at the top left, and no board around it.
+      final back = bb.rectOf(bb.tip('Back').hitTestable());
       final field = bb.rectOf(bb.titleField(title));
-      expect(field.width, greaterThan(bb.window.width * 0.8), reason: 'Not full width');
-      expect(bb.visible(bb.field('Filter tasks…')), isFalse, reason: 'The board is still there');
+      bb.note(
+        'back button at ${back.topLeft}, title from x=${field.left.round()} of ${bb.window.width.round()}',
+      );
+      expect(back.left, lessThan(bb.window.width * 0.15), reason: 'No back button at the top left');
+      expect(
+        field.left,
+        lessThan(bb.window.width * 0.2),
+        reason: 'The task does not start at the left',
+      );
+      expect(bb.visible(bb.filtersButton), isFalse, reason: 'The board is still there');
+      expect(bb.visible(bb.text(scratch.nameOf(1))), isFalse, reason: 'Board columns still show');
     });
   }
 
@@ -87,7 +98,7 @@ void main() {
 
     // A link in a description: E-格式 16 points at E-三层 祖父, a task of this workspace.
     await bb.openProject('E-Formats');
-    await bb.type(bb.field('Filter tasks…'), 'E-格式 16 kaneo-issue-link');
+    await bb.typeFilter('E-格式 16 kaneo-issue-link');
     await bb.pumpFor(const Duration(milliseconds: 800));
     await bb.openCard('E-格式 16 kaneo-issue-link');
     final link = bb.containing(RegExp(r'EBB-\d+|E-三层 祖父')).hitTestable();
@@ -332,7 +343,7 @@ void main() {
     final box = bb.field('Leave a comment...');
     final first = 'E-Q T7 comment $runStamp';
     await bb.type(box, first);
-    await bb.tap(bb.label('Send comment').hitTestable());
+    await bb.tap(bb.label('Send comment'));
     await bb.see(bb.text(first), seconds: 10);
     await bb.server('the comment', () async {
       return (await owner.comments(id)).any((c) => '${c['content']}'.contains(first));
@@ -385,7 +396,7 @@ void main() {
     await bb.see(field, reason: 'The mention did not go into the comment');
     final text = bb.tester.widget<EditableText>(field.first).controller.text;
     await bb.tester.enterText(field.first, '$text please look $runStamp');
-    await bb.tap(bb.label('Send comment').hitTestable());
+    await bb.tap(bb.label('Send comment'));
     await bb.shot('mentioned');
     await bb.server('the member notified', () async {
       final all = await member.notifications(Env.workspaceId);

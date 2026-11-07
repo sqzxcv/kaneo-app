@@ -31,7 +31,7 @@ void main() {
       expect(bb.showing(bb.text(scratch.nameOf(0))), isTrue);
     } else {
       expect(field.width, greaterThan(bb.window.width * 0.8), reason: 'Not full screen');
-      expect(bb.visible(bb.field('Filter tasks…')), isFalse, reason: 'The board shows');
+      expect(bb.visible(bb.filtersButton), isFalse, reason: 'The board shows');
     }
   });
 
@@ -45,7 +45,8 @@ void main() {
     await bb.scrollBoardTo(column);
     final header = bb.rectOf(bb.text(column).hitTestable());
     final add =
-        find.byTooltip('Add task').hitTestable().evaluate().where((e) {
+        // On the column's title row, scrolled into view below if a narrow screen hides it.
+        find.byTooltip('Add task').evaluate().where((e) {
           final r = bb.tester.getRect(find.byElementPredicate((x) => x == e));
           return (r.center.dy - header.center.dy).abs() < 20 && r.left > header.left;
         }).toList()..sort(
@@ -165,7 +166,11 @@ void main() {
     await bb.tap(bb.tip('New task'));
     final title = 'E-Q N6 task $runStamp';
     await bb.type(_title(bb), title);
-    await bb.tap(bb.label('Labels').hitTestable().last);
+    // A chip in the wide dialog; a row whose value opens it on a narrow page.
+    final value = bb.valueOf('Labels');
+    await bb.tap(
+      bb.showing(value) && bb.valueText('Labels').contains('label') ? value : bb.label('Labels'),
+    );
     final name = 'E-QL N6 $runStamp';
     await bb.type(bb.field('Search or create'), name);
     await bb.pumpFor(const Duration(milliseconds: 500));

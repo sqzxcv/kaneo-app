@@ -96,20 +96,36 @@ int? _count(Bb bb, String column) {
 /// Brings [title] into view: in a list by scrolling down, on a board by swiping to [column].
 Future<void> _reveal(Bb bb, String column, {required bool list, String? title}) async {
   if (list) {
-    final target = bb.text(title ?? column);
-    if (bb.visible(target)) return;
+    // The group's title, brought to the top of the list, with its rows under it.
+    final header = bb.text(column);
     final scroll = find
         .byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down)
         .evaluate()
         .where((e) => bb.tester.getRect(find.byElementPredicate((x) => x == e)).width > 300)
         .toList();
-    await bb.tester.scrollUntilVisible(
-      target,
-      400,
-      scrollable: find.byElementPredicate((e) => e == scroll.last),
-      maxScrolls: 80,
-    );
-    await bb.pumpFor(const Duration(milliseconds: 300));
+    final list = find.byElementPredicate((e) => e == scroll.last);
+    if (!bb.visible(header)) {
+      // Back to the top first: the group may be above or below.
+      await bb.tester.fling(list, const Offset(0, 20000), 8000);
+      await bb.pumpFor(const Duration(seconds: 1));
+      await bb.tester.scrollUntilVisible(header, 300, scrollable: list, maxScrolls: 80);
+    }
+    final top = bb.rectOf(list).top;
+    final at = bb.rectOf(header);
+    if (at.top - top > 12) {
+      await bb.tester.timedDragFrom(
+        Offset(at.center.dx, at.center.dy),
+        Offset(0, -(at.top - top - 8)),
+        const Duration(milliseconds: 900),
+      );
+    }
+    await bb.pumpFor(const Duration(milliseconds: 500));
+    // A drag can overshoot: ease back down, a little at a time, until the title shows.
+    final middle = bb.rectOf(list).center;
+    for (var i = 0; i < 10 && !bb.visible(header); i++) {
+      await bb.tester.timedDragFrom(middle, const Offset(0, 40), const Duration(milliseconds: 500));
+      await bb.pumpFor(const Duration(milliseconds: 300));
+    }
     return;
   }
   await bb.scrollBoardTo(column);
@@ -268,7 +284,7 @@ void main() {
   bbCase('F7', '筛选命中子任务但没命中父任务，子任务单独显示', (bb) async {
     await bb.start(Env.owner);
     await bb.openProject('E-Board');
-    await bb.type(bb.field('Filter tasks…'), _child);
+    await bb.typeFilter(_child);
     await bb.pumpFor(const Duration(seconds: 2));
     await bb.scrollBoardTo('To Do');
     await bb.shot('filtered');

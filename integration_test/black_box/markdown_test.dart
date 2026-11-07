@@ -178,8 +178,7 @@ Future<Rect> _image(Bb bb) async {
 
 /// Opens [title] from the E-Formats board, finding it with the board's filter.
 Future<void> _open(Bb bb, String title) async {
-  if (!bb.showing(bb.field('Filter tasks…'))) await bb.openProject('E-Formats');
-  await bb.type(bb.field('Filter tasks…'), title);
+  await bb.typeFilter(title);
   await bb.pumpFor(const Duration(milliseconds: 800));
   await bb.tap(bb.card(title).hitTestable());
   await bb.see(_titleField(title), seconds: 20);
@@ -205,7 +204,7 @@ Future<Finder> _edit(Bb bb, String source, Finder target, {bool beside = false})
     // Beside what it shows, on the same line, where a link isn't.
     await bb.see(target);
     final r = bb.rectOf(target);
-    await bb.tester.tapAt(Offset(r.right + 120, r.center.dy));
+    await bb.tester.tapAt(Offset(r.right + 30, r.center.dy));
     await bb.pumpFor(const Duration(milliseconds: 400));
   } else {
     await bb.tap(target);
