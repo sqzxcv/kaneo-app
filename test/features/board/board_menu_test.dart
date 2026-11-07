@@ -54,7 +54,7 @@ void main() {
         expect(find.text(app.i18n.t('mobile:board.$key')), findsOneWidget);
       }
       await choose(tester, app.i18n.t('mobile:board.openTask'));
-      expect(app.container.read(routerProvider).state.uri.path, AppRoutes.task('task-1'));
+      expect(taskOpen('task-1'), findsOneWidget);
     });
   }
 

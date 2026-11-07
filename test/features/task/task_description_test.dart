@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kaneo_app/core/core.dart';
 import 'package:kaneo_app/features/auth/login_page.dart';
+import 'package:kaneo_app/features/markdown/markdown_field.dart';
 import 'package:kaneo_app/features/markdown/markdown_view.dart';
 import 'package:kaneo_app/features/task/description_autosave.dart';
 import 'package:kaneo_app/features/task/task_description.dart';
@@ -49,7 +50,7 @@ const _source =
 
 const _savePath = 'api/task/description/doc';
 
-final _box = find.byType(TextField);
+final _box = find.descendant(of: find.byType(MarkdownField), matching: find.byType(TextField));
 
 List<String> _saves(FakeKaneo server, [String path = _savePath]) => [
   for (final request in server.requestsTo(path, method: 'PUT'))

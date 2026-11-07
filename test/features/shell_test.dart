@@ -226,13 +226,14 @@ void main() {
       );
       await tester.tap(find.text('Set up the project'));
       await tester.pumpAndSettle();
-      expect(router.state.uri.path, AppRoutes.task('task-1'));
+      expect(taskOpen('task-1'), findsOneWidget);
 
       await resize(tester, isWideSize(size) ? narrowSize : wideSize);
-      expect(router.state.uri.path, AppRoutes.task('task-1'));
+      expect(taskOpen('task-1'), findsOneWidget);
 
       router.pop();
       await tester.pumpAndSettle();
+      expect(taskOpen('task-1'), findsNothing);
       expect(router.state.uri.path, AppRoutes.board(FakeKaneo.projectId));
       router.pop();
       await tester.pumpAndSettle();

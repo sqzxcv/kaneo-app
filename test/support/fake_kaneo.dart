@@ -1179,7 +1179,12 @@ class FakeKaneo implements HttpClientAdapter {
       );
     });
     _route('PUT', 'api/task/:id', (request, params) {
-      return _taskDetail(_find(tasks, params[0], 'Task')..addAll(_body(request)));
+      // Like the server, this replaces the whole task, so an optional field left out is cleared.
+      return _taskDetail(
+        _find(tasks, params[0], 'Task')
+          ..addAll({'startDate': null, 'dueDate': null, 'userId': null})
+          ..addAll(_body(request)),
+      );
     });
     _route('DELETE', 'api/task/:id', (request, params) {
       final task = _find(tasks, params[0], 'Task');

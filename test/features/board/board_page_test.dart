@@ -78,7 +78,7 @@ void main() {
     expect(find.descendant(of: card, matching: find.byTooltip('Test User')), findsOneWidget);
     await tester.tap(find.text('Set up the project'));
     await tester.pumpAndSettle();
-    expect(app.container.read(routerProvider).state.uri.path, AppRoutes.task('task-1'));
+    expect(taskOpen('task-1'), findsOneWidget);
   });
 
   testBothLayouts('one pull refresh keeps all columns and card positions', (tester, size) async {

@@ -86,10 +86,10 @@ void main() {
   });
 
   testBothLayouts('clicking a list row opens the shared task route', (tester, size) async {
-    final app = await openList(tester, size);
+    await openList(tester, size);
     await tester.tap(find.descendant(of: row('task-1'), matching: find.text('Set up the project')));
     await tester.pumpAndSettle();
-    expect(app.container.read(routerProvider).state.uri.path, AppRoutes.task('task-1'));
+    expect(taskOpen('task-1'), findsOneWidget);
   });
 
   testBothLayouts('empty list keeps status headers and consistent empty messages', (

@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kaneo_app/app.dart';
 import 'package:kaneo_app/core/core.dart';
 import 'package:kaneo_app/features/shell/app_shell.dart' show shellPageKey;
+import 'package:kaneo_app/features/task/task_view.dart' show TaskView;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fake_kaneo.dart';
@@ -62,6 +63,10 @@ void setWindowSize(WidgetTester tester, Size size) {
 /// that also lists the projects and scrolls, so in a test that runs on both layouts use
 /// `inPage(find.text('Demo'))` and `scrollUntilVisible(..., scrollable: inPage(find.byType(Scrollable)).first)`.
 Finder inPage(Finder finder) => find.descendant(of: find.byKey(shellPageKey), matching: finder);
+
+/// The open task [id], whether it is a panel over the page, as `openTask` gives on wide windows, or
+/// a page of its own. A panel doesn't change the router's location.
+Finder taskOpen(String id) => find.byWidgetPredicate((w) => w is TaskView && w.taskId == id);
 
 /// Provider overrides that run the app against [server], with nothing kept on disk.
 Future<List<Override>> _overrides(

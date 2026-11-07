@@ -51,7 +51,7 @@ void main() {
       await tester.ensureVisible(find.text('Set up the project'));
       await tester.tap(find.text('Set up the project'));
       await tester.pumpAndSettle();
-      expect(find.text('Task'), findsOneWidget);
+      expect(taskOpen('task-1'), findsOneWidget);
     });
 
     testBothLayouts('openTask and openNewTask go through the shared entry points', (
@@ -64,7 +64,7 @@ void main() {
 
       openTask(context, 'task-1', projectId: FakeKaneo.projectId);
       await tester.pumpAndSettle();
-      expect(router.state.uri.path, '/task/task-1');
+      expect(taskOpen('task-1'), findsOneWidget);
       expect(find.text('Set up the project'), findsWidgets);
 
       router.pop();
