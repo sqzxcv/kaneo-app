@@ -23,8 +23,10 @@ class BoardLanes extends StatefulWidget {
     required this.onMove,
     this.busy = false,
     this.onMenu,
+    this.emptyMessage,
   });
   final BoardData board;
+  final String? emptyMessage;
   final bool busy;
   final void Function(BuildContext context, BoardTask task, Offset position)? onMenu;
   final void Function(String id, String status, int index) onMove;
@@ -219,7 +221,7 @@ class _BoardLanesState extends State<BoardLanes> {
                       ? Padding(
                           padding: const EdgeInsets.all(24),
                           child: Text(
-                            context.t('mobile:board.noTasksHere'),
+                            widget.emptyMessage ?? context.t('mobile:board.noTasksHere'),
                             textAlign: TextAlign.center,
                             style: TextStyle(color: context.colors.mutedForeground),
                           ),

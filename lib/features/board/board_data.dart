@@ -1,10 +1,15 @@
 import 'package:kaneo_app/core/core.dart';
 
-Iterable<BoardTask> boardTasks(BoardData board) =>
-    board.columns.expand((c) => c.tasks ?? <BoardTask>[]);
+Iterable<BoardTask> boardTasks(BoardData board) => [
+  ...board.columns.expand((c) => c.tasks ?? <BoardTask>[]),
+  ...board.plannedTasks,
+  ...board.archivedTasks,
+];
 
 BoardData updateBoardTask(BoardData board, String id, BoardTask Function(BoardTask) update) =>
     board.copyWith(
+      plannedTasks: [for (final task in board.plannedTasks) task.id == id ? update(task) : task],
+      archivedTasks: [for (final task in board.archivedTasks) task.id == id ? update(task) : task],
       columns: [
         for (final column in board.columns)
           column.copyWith(

@@ -393,7 +393,7 @@ void main() {
 
       app.container.read(routerProvider).push(AppRoutes.board(FakeKaneo.projectId));
       await tester.pumpAndSettle();
-      expect(find.text('4 列'), findsOneWidget);
+      expect(find.text('4 列'), size == wideSize ? findsOneWidget : findsNothing);
       expect(find.text('2 个任务'), findsNWidgets(2));
       expect(find.text('1 个任务'), findsNWidgets(2));
       expect(find.textContaining('tasks'), findsNothing);
@@ -413,7 +413,7 @@ void main() {
       await tester.pumpAndSettle();
       app.container.read(routerProvider).push(AppRoutes.board(FakeKaneo.projectId));
       await tester.pumpAndSettle();
-      expect(find.text('4 columns'), findsOneWidget);
+      expect(find.text('4 columns'), size == wideSize ? findsOneWidget : findsNothing);
       expect(find.text('1 task'), findsNWidgets(2));
       expect(find.text('2 tasks'), findsNWidgets(2));
     });

@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:kaneo_app/core/core.dart';
 
 import '../task/open_task.dart';
 import 'board_lanes.dart';
+import 'board_list.dart';
 import 'board_data.dart';
 import 'board_move.dart';
 import 'board_orientation.dart';
+import 'board_filters.dart';
+import 'board_toolbar.dart';
 
 class BoardPage extends ConsumerStatefulWidget {
   const BoardPage({super.key, required this.projectId});
@@ -20,28 +22,67 @@ class BoardPage extends ConsumerStatefulWidget {
 }
 
 class _BoardPageState extends ConsumerState<BoardPage> {
+  BoardFilters _filters = const BoardFilters();
+  bool _listView = false;
+  bool _showPlanned = false;
+  bool _showArchived = false;
   bool _moving = false;
   bool _menuOpen = false;
   final _refreshKey = GlobalKey<RefreshIndicatorState>();
+
+  @override
+  void didUpdateWidget(BoardPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.projectId != widget.projectId) {
+      _filters = const BoardFilters();
+      _showPlanned = false;
+      _showArchived = false;
+    }
+  }
+
+  BoardData _expanded(BoardData board) => expandBoardCollections(
+    board,
+    plannedName: context.t('mobile:board.planned'),
+    archivedName: context.t('mobile:board.archived'),
+  );
+
+  BoardData _visible(BoardData board) => filterBoard(
+    _expanded(board),
+    _filters,
+    showPlanned: _showPlanned,
+    showArchived: _showArchived,
+  );
+
+  void _moveVisible(String id, String status, int index) {
+    final board = ref.read(boardQuery(widget.projectId)).value;
+    if (board == null) return;
+    final full = _expanded(board).columns.firstWhere((c) => c.slug == status);
+    final shown = _visible(board).columns.firstWhere((c) => c.slug == status);
+    _move(id, status, unfilteredDropIndex(full, shown, index));
+  }
 
   Future<void> _move(String id, String status, int index) async {
     if (_moving) return;
     final query = boardQuery(widget.projectId);
     final board = ref.read(query).value;
     if (board == null) return;
-    final move = planBoardMove(board, id, status, index);
+    final move = planBoardMove(_expanded(board), id, status, index);
     if (move == null) return;
     final subscription = ProviderScope.containerOf(context, listen: false).listen(query, (_, _) {});
     final notifier = ref.read(query.notifier);
     final api = ref.read(kaneoApiProvider);
     setState(() => _moving = true);
-    notifier.setData(move.after);
+    notifier.setData(collapseBoardCollections(move.after));
     final ok = await runAction(context, () async {
       await api.reorderTasks(widget.projectId, move.updates);
       return true;
     });
     if (ok != true) {
-      notifier.setData(move.rollback(subscription.read().value ?? move.after));
+      notifier.setData(
+        collapseBoardCollections(
+          move.rollback(expandBoardCollections(subscription.read().value ?? board)),
+        ),
+      );
     }
     subscription.close();
     if (mounted) setState(() => _moving = false);
@@ -119,8 +160,9 @@ class _BoardPageState extends ConsumerState<BoardPage> {
         ],
       );
       if (!mounted || !anchor.mounted || action == null) return;
-      final board = ref.read(boardQuery(widget.projectId)).value;
-      if (board == null) return;
+      final raw = ref.read(boardQuery(widget.projectId)).value;
+      if (raw == null) return;
+      final board = _expanded(raw);
       final current = boardTasks(board).where((t) => t.id == task.id).firstOrNull;
       if (current == null) return;
       switch (action) {
@@ -207,53 +249,30 @@ class _BoardPageState extends ConsumerState<BoardPage> {
     final value = ref.watch(query);
     return BoardOrientation(
       projectId: widget.projectId,
+      enabled: !_listView,
       child: Scaffold(
-        appBar: AppBar(
-          toolbarHeight: context.isWide ? 56 : 48,
-          leading: IconButton(
-            tooltip: context.t('mobile:board.back'),
-            icon: const Icon(LucideIcons.arrowLeft, size: 20),
-            onPressed: () => context.canPop() ? context.pop() : context.go(AppRoutes.home),
-          ),
-          titleSpacing: 0,
-          title: Row(
-            children: [
-              Flexible(
-                child: Text(
-                  value.value?.name ?? context.t('mobile:board.board'),
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
-              if (value.hasValue) ...[
-                const SizedBox(width: 8),
-                Text(
-                  context.t('app:board.columnCount', {'count': value.requireValue.columns.length}),
-                  style: TextStyle(fontSize: 11, color: context.colors.mutedForeground),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            IconButton(
-              tooltip: context.t('mobile:board.refresh'),
-              icon: const Icon(LucideIcons.refreshCw, size: 18),
-              onPressed: value.isLoading || _moving
-                  ? null
-                  : () {
-                      if (_refreshKey.currentState != null) {
-                        _refreshKey.currentState!.show();
-                      } else {
-                        _refresh();
-                      }
-                    },
-            ),
-            IconButton(
-              tooltip: context.t('mobile:board.newTask'),
-              icon: const Icon(LucideIcons.plus, size: 20),
-              onPressed: () => openNewTask(context, projectId: widget.projectId),
-            ),
-          ],
+        appBar: BoardToolbar(
+          listView: _listView,
+          onViewChanged: () => setState(() => _listView = !_listView),
+          projectId: widget.projectId,
+          board: value.value,
+          filters: _filters,
+          onFilters: (filters) => setState(() => _filters = filters),
+          showPlanned: _showPlanned,
+          showArchived: _showArchived,
+          onCollections: (planned, archived) => setState(() {
+            _showPlanned = planned;
+            _showArchived = archived;
+          }),
+          busy: value.isLoading || _moving,
+          wide: context.isWide,
+          onRefresh: () {
+            if (_refreshKey.currentState != null) {
+              _refreshKey.currentState!.show();
+            } else {
+              _refresh();
+            }
+          },
         ),
         body: SafeArea(
           top: false,
@@ -266,7 +285,26 @@ class _BoardPageState extends ConsumerState<BoardPage> {
               key: _refreshKey,
               onRefresh: _refresh,
               notificationPredicate: (notification) => notification.metrics.axis == Axis.vertical,
-              child: BoardLanes(board: board, busy: _moving, onMove: _move, onMenu: _menu),
+              child: _listView
+                  ? BoardList(
+                      board: _visible(board),
+                      onMenu: _menu,
+                      emptyMessage: context.t(
+                        _filters.active
+                            ? 'mobile:board.noTasksMatchTheFilters'
+                            : 'mobile:board.noTasksHere',
+                      ),
+                    )
+                  : BoardLanes(
+                      key: ValueKey(widget.projectId),
+                      board: _visible(board),
+                      busy: _moving,
+                      onMove: _moveVisible,
+                      onMenu: _menu,
+                      emptyMessage: _filters.active
+                          ? context.t('mobile:board.noTasksMatchTheFilters')
+                          : null,
+                    ),
             ),
           ),
         ),

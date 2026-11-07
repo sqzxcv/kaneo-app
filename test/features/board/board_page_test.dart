@@ -256,20 +256,18 @@ void main() {
         null,
       ),
     );
-    final enabled = ValueNotifier(true);
-    addTearDown(enabled.dispose);
-    await pumpInApp(
+    await pumpKaneoApp(
       tester,
-      ValueListenableBuilder<bool>(
-        valueListenable: enabled,
-        builder: (context, value, _) =>
-            BoardOrientation(projectId: 'p', enabled: value, child: const SizedBox()),
-      ),
+      size: narrowSize.flipped,
+      location: AppRoutes.board(FakeKaneo.projectId),
     );
     expect(calls.single.length, 2);
-    enabled.value = false;
-    await tester.pump();
+    await tester.tap(find.byTooltip('List view'));
+    await tester.pumpAndSettle();
     expect(calls.last, isEmpty);
+    await tester.tap(find.byTooltip('Board view'));
+    await tester.pumpAndSettle();
+    expect(calls.last.length, 2);
     debugDefaultTargetPlatformOverride = null;
   });
 }
