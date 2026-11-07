@@ -69,7 +69,12 @@ Future<void> search(WidgetTester tester, String value) async {
     await tap(tester, find.byKey(const ValueKey('board-search-toggle')));
   }
   await tester.enterText(find.byKey(const ValueKey('board-search')), value);
+  FocusManager.instance.primaryFocus?.unfocus();
   await tester.pumpAndSettle();
+  expect(
+    tester.widget<TextField>(find.byKey(const ValueKey('board-search'))).controller!.text,
+    value,
+  );
 }
 
 Future<void> closeSearch(WidgetTester tester) async {
@@ -119,6 +124,10 @@ Future<void> dragTo(WidgetTester tester, String id, Offset target, {bool mouse =
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('B board local acceptance on $device', (tester) async {
+    // Keep injected search input from racing the native IME. Native/Chinese
+    // keyboard behavior remains a separate manual acceptance item.
+    tester.testTextInput.register();
+    addTearDown(tester.testTextInput.unregister);
     final config = DevConfig.fromEnvironment();
     final host = Uri.parse(config.serverUrl).host;
     expect(['localhost', '127.0.0.1', '::1'], contains(host), reason: 'Local Kaneo only.');
@@ -299,6 +308,11 @@ void main() {
     await menu(tester, 'B Parent');
     await tap(tester, find.text('Move to').last);
     await tap(tester, find.text('需求池').last);
+    await shot(tester, '03b-menu-return');
+    expect(
+      tester.widget<TextField>(find.byKey(const ValueKey('board-search'))).controller!.text,
+      'B Parent',
+    );
     await see(
       tester,
       find.descendant(of: find.byKey(ValueKey('drop-column-$todo')), matching: card(parent.id)),
