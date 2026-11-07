@@ -75,6 +75,8 @@ Kaneo 的 Flutter 客户端，覆盖 iOS、iPadOS、Android、macOS、Windows、
 - iOS 模拟器和完整构建必须用 `tool/with_device.sh` 排队，同一时间只运行一个，用完关闭。不开 Android 模拟器
 - 用 `--boot` 启动的模拟器，`tool/with_device.sh` 结束时会关闭。别的模拟器不是你的，不要关，也不要用 `xcrun simctl shutdown all`
 
+macOS 设备测试每条线使用自己固定的测试 bundle ID，并保持本地签名身份一致：A 线 `app.kaneo.kaneoApp.ATest`、B 线 `app.kaneo.kaneoApp.BTest`、C 线 `app.kaneo.kaneoApp.CTest`、D 线 `app.kaneo.kaneoApp.DTest`。通过本次命令的 `FLUTTER_XCODE_PRODUCT_BUNDLE_IDENTIFIER` 环境变量覆盖，不改仓库里的正式 bundle ID，也不要把测试覆盖带进分发构建。不同签名共用同一个 macOS 应用容器可能卡在 `_libsecinit_appsandbox`，测试不会自行退出，还会一直占用设备队列。
+
 ## 常用命令
 
 ```bash
@@ -90,7 +92,9 @@ tool/with_device.sh --boot "iPhone 17" flutter test integration_test -d "iPhone 
   --dart-define-from-file=$HOME/.config/kaneo-app/dev.env
 tool/with_device.sh --boot "iPad Pro 13-inch (M5)" flutter test integration_test -d "iPad Pro 13-inch (M5)" \
   --dart-define-from-file=$HOME/.config/kaneo-app/dev.env
-tool/with_device.sh flutter test integration_test -d macos \
+# macOS 示例用 D 线 ID，其他线替换成自己的固定 ID
+FLUTTER_XCODE_PRODUCT_BUNDLE_IDENTIFIER=app.kaneo.kaneoApp.DTest \
+  tool/with_device.sh flutter test integration_test -d macos \
   --dart-define-from-file=$HOME/.config/kaneo-app/dev.env
 ```
 
