@@ -20,6 +20,7 @@ class BoardToolbar extends ConsumerStatefulWidget implements PreferredSizeWidget
     required this.onCollections,
     required this.onRefresh,
     required this.busy,
+    this.canCreate = true,
     required this.wide,
     required this.listView,
     required this.onViewChanged,
@@ -35,6 +36,9 @@ class BoardToolbar extends ConsumerStatefulWidget implements PreferredSizeWidget
   final void Function(bool planned, bool archived) onCollections;
   final VoidCallback onRefresh;
   final bool busy;
+
+  /// Whether the member may create tasks. Without it there is no button for a new one.
+  final bool canCreate;
   final bool wide;
   @override
   Size get preferredSize => Size.fromHeight(wide ? 56 : 48);
@@ -322,11 +326,12 @@ class _BoardToolbarState extends ConsumerState<BoardToolbar> {
           icon: LucideIcons.refreshCw,
           onPressed: widget.busy ? null : widget.onRefresh,
         ),
-        _button(
-          tooltip: context.t('mobile:board.newTask'),
-          icon: LucideIcons.plus,
-          onPressed: () => openNewTask(context, projectId: widget.projectId),
-        ),
+        if (widget.canCreate)
+          _button(
+            tooltip: context.t('mobile:board.newTask'),
+            icon: LucideIcons.plus,
+            onPressed: () => openNewTask(context, projectId: widget.projectId),
+          ),
       ],
     ],
   );

@@ -27,6 +27,8 @@ class BoardLanes extends ConsumerStatefulWidget {
     required this.board,
     required this.onMove,
     this.busy = false,
+    this.canCreate = true,
+    this.canMove = true,
     this.onMenu,
     this.emptyMessage,
     this.sourceBoard,
@@ -36,6 +38,12 @@ class BoardLanes extends ConsumerStatefulWidget {
   final BoardData? sourceBoard;
   final String? emptyMessage;
   final bool busy;
+
+  /// Whether the member may create tasks. Without it the columns offer no new ones.
+  final bool canCreate;
+
+  /// Whether the member may change tasks. Without it the cards can't be picked up.
+  final bool canMove;
   final void Function(BuildContext context, BoardTask task, Offset position)? onMenu;
   final void Function(String id, String status, int index) onMove;
 
@@ -126,15 +134,17 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
 
   Widget _card(HierarchyRow row, BoardColumn column, double width) {
     final task = row.task;
-    final handle = _draggable(
-      task,
-      width,
-      Padding(
-        key: ValueKey('drag-handle-${task.id}'),
-        padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
-        child: Icon(LucideIcons.gripVertical, size: 20, color: context.colors.chipIcon),
-      ),
-    );
+    final handle = !widget.canMove
+        ? null
+        : _draggable(
+            task,
+            width,
+            Padding(
+              key: ValueKey('drag-handle-${task.id}'),
+              padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
+              child: Icon(LucideIcons.gripVertical, size: 20, color: context.colors.chipIcon),
+            ),
+          );
     final card = Opacity(
       opacity: _dragging == task.id ? 0.35 : 1,
       child: BoardCard(
@@ -149,7 +159,8 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
       ),
     );
     // Touch scrolling and the long-press menu remain available on the card body.
-    return defaultTargetPlatform == TargetPlatform.iOS ||
+    return !widget.canMove ||
+            defaultTargetPlatform == TargetPlatform.iOS ||
             defaultTargetPlatform == TargetPlatform.android
         ? card
         : _draggable(task, width, card);
@@ -244,16 +255,20 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
                     context.t('app:board.taskCount', {'count': tasks.length}),
                     style: TextStyle(fontSize: 11, color: context.colors.boardId),
                   ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    key: ValueKey('add-task-column-${column.slug}'),
-                    tooltip: context.t('mobile:board.addTask'),
-                    icon: const Icon(LucideIcons.plus, size: 16),
-                    constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-                    padding: EdgeInsets.zero,
-                    onPressed: () =>
-                        openNewTask(context, projectId: widget.board.id, status: column.slug),
-                  ),
+                  if (widget.canCreate) ...[
+                    const SizedBox(width: 4),
+                    IconButton(
+                      key: ValueKey('add-task-column-${column.slug}'),
+                      tooltip: context.t('mobile:board.addTask'),
+                      icon: const Icon(LucideIcons.plus, size: 16),
+                      constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                      padding: EdgeInsets.zero,
+                      onPressed: () =>
+                          openNewTask(context, projectId: widget.board.id, status: column.slug),
+                    ),
+                  ] else
+                    // Keeps the header as tall, and the count as far from the edge, as the button.
+                    const SizedBox(width: 8, height: 32),
                 ],
               ),
             ),
@@ -277,17 +292,19 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: context.colors.mutedForeground),
                               ),
-                              const SizedBox(height: 8),
-                              TextButton.icon(
-                                key: ValueKey('add-task-empty-${column.slug}'),
-                                icon: const Icon(LucideIcons.plus, size: 16),
-                                label: Text(context.t('mobile:board.addTask')),
-                                onPressed: () => openNewTask(
-                                  context,
-                                  projectId: widget.board.id,
-                                  status: column.slug,
+                              if (widget.canCreate) ...[
+                                const SizedBox(height: 8),
+                                TextButton.icon(
+                                  key: ValueKey('add-task-empty-${column.slug}'),
+                                  icon: const Icon(LucideIcons.plus, size: 16),
+                                  label: Text(context.t('mobile:board.addTask')),
+                                  onPressed: () => openNewTask(
+                                    context,
+                                    projectId: widget.board.id,
+                                    status: column.slug,
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                         )

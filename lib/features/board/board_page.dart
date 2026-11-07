@@ -116,44 +116,60 @@ class _BoardPageState extends ConsumerState<BoardPage> {
     if (mounted) setState(() => _moving = false);
   }
 
+  /// What the signed-in member may do on [board], or null until it has loaded. Until then
+  /// everything counts as allowed, because the server has the last word.
+  WorkspaceCapabilities? _permissions(BoardData? board, {bool listen = true}) {
+    if (board == null) return null;
+    final query = capabilitiesQuery(board.workspaceId);
+    return (listen ? ref.watch(query) : ref.read(query)).value;
+  }
+
   Future<void> _menu(BuildContext anchor, BoardTask task, Offset position) async {
     if (_menuOpen) return;
+    final can = _permissions(ref.read(boardQuery(widget.projectId)).value, listen: false);
+    final canEdit = can?.updateTasks != false;
+    final canAssign = can?.assignTasks != false;
     _menuOpen = true;
     try {
       final action = await showActionMenu(
         anchor,
         position: position,
         items: [
-          MenuAction(
-            value: 'status',
-            label: context.t('mobile:board.moveTo'),
-            icon: LucideIcons.arrowRight,
-            enabled: !_moving,
-          ),
-          MenuAction(
-            value: 'assignee',
-            label: context.t('mobile:board.assignee'),
-            icon: LucideIcons.user,
-            enabled: !_moving,
-          ),
-          MenuAction(
-            value: 'priority',
-            label: context.t('mobile:board.priority'),
-            icon: LucideIcons.signal,
-            enabled: !_moving,
-          ),
-          MenuAction(
-            value: 'top',
-            label: context.t('mobile:board.sendToTopOfColumn'),
-            icon: LucideIcons.arrowUpToLine,
-            enabled: !_moving,
-          ),
-          MenuAction(
-            value: 'bottom',
-            label: context.t('mobile:board.sendToBottomOfColumn'),
-            icon: LucideIcons.arrowDownToLine,
-            enabled: !_moving,
-          ),
+          if (canEdit)
+            MenuAction(
+              value: 'status',
+              label: context.t('mobile:board.moveTo'),
+              icon: LucideIcons.arrowRight,
+              enabled: !_moving,
+            ),
+          if (canAssign)
+            MenuAction(
+              value: 'assignee',
+              label: context.t('mobile:board.assignee'),
+              icon: LucideIcons.user,
+              enabled: !_moving,
+            ),
+          if (canEdit)
+            MenuAction(
+              value: 'priority',
+              label: context.t('mobile:board.priority'),
+              icon: LucideIcons.signal,
+              enabled: !_moving,
+            ),
+          if (canEdit)
+            MenuAction(
+              value: 'top',
+              label: context.t('mobile:board.sendToTopOfColumn'),
+              icon: LucideIcons.arrowUpToLine,
+              enabled: !_moving,
+            ),
+          if (canEdit)
+            MenuAction(
+              value: 'bottom',
+              label: context.t('mobile:board.sendToBottomOfColumn'),
+              icon: LucideIcons.arrowDownToLine,
+              enabled: !_moving,
+            ),
           MenuAction(
             value: 'open',
             label: context.t('mobile:board.openTask'),
@@ -254,6 +270,8 @@ class _BoardPageState extends ConsumerState<BoardPage> {
     final query = boardQuery(widget.projectId);
     final value = ref.watch(query);
     ref.watch(boardSyncProvider(widget.projectId)).saving = () => _moving;
+    final can = _permissions(value.value);
+    final canCreate = can?.createTasks != false;
     return BoardOrientation(
       projectId: widget.projectId,
       enabled: !_listView,
@@ -272,6 +290,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
             _showArchived = archived;
           }),
           busy: value.isLoading || _moving,
+          canCreate: canCreate,
           wide: context.isWide,
           onRefresh: () {
             if (_refreshKey.currentState != null) {
@@ -289,12 +308,14 @@ class _BoardPageState extends ConsumerState<BoardPage> {
             isEmpty: (board) => board.columns.isEmpty,
             empty: StatusMessage(
               title: context.t('mobile:board.noTasksHere'),
-              action: TextButton.icon(
-                key: const ValueKey('board-empty-add-task'),
-                icon: const Icon(LucideIcons.plus, size: 16),
-                label: Text(context.t('mobile:board.addTask')),
-                onPressed: () => openNewTask(context, projectId: widget.projectId),
-              ),
+              action: canCreate
+                  ? TextButton.icon(
+                      key: const ValueKey('board-empty-add-task'),
+                      icon: const Icon(LucideIcons.plus, size: 16),
+                      label: Text(context.t('mobile:board.addTask')),
+                      onPressed: () => openNewTask(context, projectId: widget.projectId),
+                    )
+                  : null,
             ),
             builder: (context, board) => RefreshIndicator(
               key: _refreshKey,
@@ -316,6 +337,8 @@ class _BoardPageState extends ConsumerState<BoardPage> {
                       key: ValueKey(widget.projectId),
                       board: _visible(board),
                       busy: _moving,
+                      canCreate: canCreate,
+                      canMove: can?.updateTasks != false,
                       onMove: _moveVisible,
                       onMenu: _menu,
                       onDragging: (dragging) =>
