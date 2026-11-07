@@ -238,13 +238,10 @@ class _BoardPageState extends ConsumerState<BoardPage> {
     if (_moving) return;
     final query = boardQuery(widget.projectId);
     final relations = projectRelationsQuery(widget.projectId);
-    await Future.wait([
-      ref.read(query.notifier).refresh(),
-      if (_listView) ref.read(relations.notifier).refresh(),
-    ]);
+    await Future.wait([ref.read(query.notifier).refresh(), ref.read(relations.notifier).refresh()]);
     if (mounted && ref.read(query).hasError) {
       showToast(context, userMessage(context, ref.read(query).error));
-    } else if (mounted && _listView && ref.read(relations).hasError) {
+    } else if (mounted && ref.read(relations).hasError) {
       showToast(context, userMessage(context, ref.read(relations).error));
     }
   }
@@ -303,6 +300,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
                       ),
                     )
                   : BoardLanes(
+                      sourceBoard: board,
                       key: ValueKey(widget.projectId),
                       board: _visible(board),
                       busy: _moving,

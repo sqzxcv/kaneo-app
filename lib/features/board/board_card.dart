@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:kaneo_app/core/core.dart';
 
 import '../task/open_task.dart';
+import 'board_hierarchy.dart';
 
 class BoardCard extends StatelessWidget {
   const BoardCard({
@@ -13,9 +14,13 @@ class BoardCard extends StatelessWidget {
     this.isFinal = false,
     this.dragHandle,
     this.onMenu,
+    this.hierarchy,
+    this.onToggle,
   });
 
   final BoardTask task;
+  final HierarchyRow? hierarchy;
+  final VoidCallback? onToggle;
   final String projectSlug;
   final bool isFinal;
   final Widget? dragHandle;
@@ -57,6 +62,28 @@ class BoardCard extends StatelessWidget {
                 Row(
                   children: [
                     ?dragHandle,
+                    if ((hierarchy?.childCount ?? 0) > 0)
+                      SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: IconButton(
+                          key: ValueKey('expand-task-${task.id}'),
+                          tooltip: context.t(
+                            hierarchy!.expanded
+                                ? 'app:board.collapseChildren'
+                                : 'app:board.expandChildren',
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: onToggle,
+                          icon: Icon(
+                            hierarchy!.expanded
+                                ? LucideIcons.chevronDown
+                                : LucideIcons.chevronRight,
+                            size: 16,
+                          ),
+                        ),
+                      ),
                     Expanded(
                       child: Text(
                         ticketId(projectSlug, task.number),
@@ -93,6 +120,17 @@ class BoardCard extends StatelessWidget {
                     color: isFinal ? colors.boardTitleDone : colors.boardTitle,
                   ),
                 ),
+                if (hierarchy?.parentTitles.isNotEmpty ?? false)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      '${context.t('mobile:taskDetail.subtasks.parent')}: ${hierarchy!.parentTitles.join(', ')}',
+                      key: ValueKey('parent-titles-${task.id}'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, color: colors.mutedForeground),
+                    ),
+                  ),
                 if ((task.priority != null && task.priority != 'no-priority') ||
                     due.isNotEmpty ||
                     (task.labels?.isNotEmpty ?? false) ||

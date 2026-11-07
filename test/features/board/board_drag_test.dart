@@ -61,7 +61,7 @@ void main() {
     });
 
     testBothLayouts('$kind reorders within a column', (tester, size) async {
-      final server = FakeKaneo();
+      final server = FakeKaneo()..relations.clear();
       await pumpKaneoApp(
         tester,
         server: server,

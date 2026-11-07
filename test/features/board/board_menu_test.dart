@@ -145,6 +145,7 @@ void main() {
     final app = await pumpKaneoApp(
       tester,
       size: size,
+      server: FakeKaneo()..relations.clear(),
       location: AppRoutes.board(FakeKaneo.projectId),
     );
     await menu(tester, 'task-1');

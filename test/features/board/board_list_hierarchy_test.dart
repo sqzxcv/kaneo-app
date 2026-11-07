@@ -180,8 +180,12 @@ void main() {
       tester,
       server: server,
       size: size,
+      settle: false,
       location: AppRoutes.board(FakeKaneo.projectId),
     );
+    for (var i = 0; i < 15; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
     await tester.tap(find.byTooltip('List view'));
     await tester.pump();
     expect(find.byType(CircularProgressIndicator), findsOneWidget);

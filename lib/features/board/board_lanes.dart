@@ -2,11 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:kaneo_app/core/core.dart';
 
 import 'board_card.dart';
 import 'board_icons.dart';
+import 'board_data.dart';
+import 'board_expansion.dart';
+import 'board_hierarchy.dart';
 
 /// A bounded speed at each edge; distance outside the viewport cannot cause a jump.
 double boardEdgeScroll(double pointer, double extent) {
@@ -16,7 +20,7 @@ double boardEdgeScroll(double pointer, double extent) {
   return 0;
 }
 
-class BoardLanes extends StatefulWidget {
+class BoardLanes extends ConsumerStatefulWidget {
   const BoardLanes({
     super.key,
     required this.board,
@@ -24,18 +28,20 @@ class BoardLanes extends StatefulWidget {
     this.busy = false,
     this.onMenu,
     this.emptyMessage,
+    this.sourceBoard,
   });
   final BoardData board;
+  final BoardData? sourceBoard;
   final String? emptyMessage;
   final bool busy;
   final void Function(BuildContext context, BoardTask task, Offset position)? onMenu;
   final void Function(String id, String status, int index) onMove;
 
   @override
-  State<BoardLanes> createState() => _BoardLanesState();
+  ConsumerState<BoardLanes> createState() => _BoardLanesState();
 }
 
-class _BoardLanesState extends State<BoardLanes> {
+class _BoardLanesState extends ConsumerState<BoardLanes> {
   final _horizontal = ScrollController();
   final _viewport = GlobalKey();
   final _vertical = <String, ScrollController>{};
@@ -111,7 +117,8 @@ class _BoardLanesState extends State<BoardLanes> {
     ),
   );
 
-  Widget _card(BoardTask task, BoardColumn column, double width) {
+  Widget _card(HierarchyRow row, BoardColumn column, double width) {
+    final task = row.task;
     final handle = _draggable(
       task,
       width,
@@ -126,6 +133,8 @@ class _BoardLanesState extends State<BoardLanes> {
       child: BoardCard(
         key: ValueKey('board-card-${task.id}'),
         task: task,
+        hierarchy: row,
+        onToggle: () => ref.read(boardExpansionProvider(widget.board.id).notifier).toggle(task.id),
         projectSlug: widget.board.slug,
         isFinal: column.isFinal == true,
         dragHandle: handle,
@@ -141,6 +150,17 @@ class _BoardLanesState extends State<BoardLanes> {
 
   @override
   Widget build(BuildContext context) {
+    final query = projectRelationsQuery(widget.board.id);
+    final relations = ref.watch(query);
+    final expanded = ref.watch(boardExpansionProvider(widget.board.id));
+    return AsyncBody(
+      value: relations,
+      onRetry: () => ref.read(query.notifier).refresh(),
+      builder: (context, data) => _lanes(data, expanded),
+    );
+  }
+
+  Widget _lanes(List<TaskRelation> relations, Set<String> expanded) {
     final width = context.isWide ? 300.0 : 280.0;
     return SizedBox(
       key: _viewport,
@@ -159,7 +179,7 @@ class _BoardLanesState extends State<BoardLanes> {
               for (final column in widget.board.columns)
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: SizedBox(width: width, child: _column(column, width)),
+                  child: SizedBox(width: width, child: _column(column, width, relations, expanded)),
                 ),
             ],
           ),
@@ -168,8 +188,20 @@ class _BoardLanesState extends State<BoardLanes> {
     );
   }
 
-  Widget _column(BoardColumn column, double width) {
+  Widget _column(
+    BoardColumn column,
+    double width,
+    List<TaskRelation> relations,
+    Set<String> expanded,
+  ) {
     final tasks = column.tasks ?? const <BoardTask>[];
+    final rows = buildBoardHierarchy(
+      tasks: tasks,
+      allTasks: boardTasks(widget.sourceBoard ?? widget.board),
+      relations: relations,
+      expanded: expanded,
+    );
+    final taskIndices = {for (final (index, task) in tasks.indexed) task.id: index};
     final controller = _vertical.putIfAbsent(column.id, ScrollController.new);
     final key = _laneKeys.putIfAbsent(column.id, GlobalKey.new);
     return DragTarget<String>(
@@ -216,8 +248,8 @@ class _BoardLanesState extends State<BoardLanes> {
                   controller: controller,
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                  itemCount: tasks.isEmpty ? 1 : tasks.length,
-                  itemBuilder: (context, index) => tasks.isEmpty
+                  itemCount: rows.isEmpty ? 1 : rows.length,
+                  itemBuilder: (context, index) => rows.isEmpty
                       ? Padding(
                           padding: const EdgeInsets.all(24),
                           child: Text(
@@ -227,13 +259,23 @@ class _BoardLanesState extends State<BoardLanes> {
                           ),
                         )
                       : _CardTarget(
-                          key: ValueKey('drop-card-${tasks[index].id}'),
+                          key: ValueKey('drop-card-${rows[index].task.id}'),
                           enabled: !widget.busy,
-                          onDrop: (id, after) =>
-                              widget.onMove(id, column.slug, index + (after ? 1 : 0)),
+                          onDrop: (id, after) => widget.onMove(
+                            id,
+                            column.slug,
+                            taskIndices[rows[index].task.id]! + (after ? 1 : 0),
+                          ),
                           child: Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _card(tasks[index], column, width),
+                            padding: EdgeInsets.only(
+                              bottom: 8,
+                              left: rows[index].depth.clamp(0, 6) * 12.0,
+                            ),
+                            child: _card(
+                              rows[index],
+                              column,
+                              width - rows[index].depth.clamp(0, 6) * 12.0,
+                            ),
                           ),
                         ),
                 ),
