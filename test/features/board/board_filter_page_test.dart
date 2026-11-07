@@ -101,6 +101,45 @@ void main() {
     expect(find.byKey(const ValueKey('board-card-task-2')), findsNothing);
     expect(tester.widget<Text>(find.byKey(const ValueKey('filter-count'))).data, '1');
   });
+  testBothLayouts('label picker waits for a delayed API response before opening', (
+    tester,
+    size,
+  ) async {
+    final server = FakeKaneo();
+    server.addLabel('B Delayed label', taskId: 'task-1');
+    final gate = server.hold('api/label/workspace/');
+    await pumpKaneoApp(
+      tester,
+      server: server,
+      size: size,
+      location: AppRoutes.board(FakeKaneo.projectId),
+    );
+    await filterMenu(tester, 'Labels');
+    await tester.pump(const Duration(seconds: 1));
+    gate.release();
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(CheckboxListTile, 'B Delayed label'), findsOneWidget);
+  });
+  testBothLayouts('reopening cached labels shows a newly created label', (tester, size) async {
+    final server = FakeKaneo();
+    server.addLabel('B Old label', taskId: 'task-1');
+    await pumpKaneoApp(
+      tester,
+      server: server,
+      size: size,
+      location: AppRoutes.board(FakeKaneo.projectId),
+    );
+    await filterMenu(tester, 'Labels');
+    await tester.tap(find.text('Save').last);
+    await tester.pumpAndSettle();
+    server.addLabel('B New label', taskId: 'task-1');
+    final gate = server.hold('api/label/workspace/');
+    await filterMenu(tester, 'Labels');
+    await tester.pump(const Duration(seconds: 1));
+    gate.release();
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(CheckboxListTile, 'B New label'), findsOneWidget);
+  });
   testBothLayouts('assignee multi-select includes unassigned and me shortcut', (
     tester,
     size,

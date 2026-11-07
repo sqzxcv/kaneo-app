@@ -34,7 +34,9 @@ Future<bool> until(WidgetTester tester, bool Function() ready, {int seconds = 20
 }
 
 Future<void> see(WidgetTester tester, Finder finder) async {
-  expect(await until(tester, () => finder.evaluate().isNotEmpty), isTrue, reason: '$finder');
+  final found = await until(tester, () => finder.evaluate().isNotEmpty);
+  if (!found) await shot(tester, 'failure');
+  expect(found, isTrue, reason: '$finder');
   await tester.pump(const Duration(milliseconds: 150));
 }
 
@@ -257,6 +259,10 @@ void main() {
     debugPrint('B_CHECK drag');
     final lane = find.byKey(PageStorageKey('column-tasks-${columns.first.slug}'));
     final headerBefore = tester.getTopLeft(header);
+    await search(tester, 'B Drag');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    await closeSearch(tester);
     final targetRect = tester.getRect(find.byKey(ValueKey('drop-card-${target.id}')));
     await dragTo(
       tester,
@@ -268,6 +274,8 @@ void main() {
     final storedMoved = await api.task(moving.id);
     final storedTarget = await api.task(target.id);
     expect(storedMoved.position!, lessThan(storedTarget.position!));
+    await tap(tester, find.byTooltip('Reset'));
+    await closeSearch(tester);
     final nextHeader = find.byKey(ValueKey('column-header-${columns[1].slug}'));
     await dragTo(tester, parent.id, tester.getTopLeft(nextHeader) + const Offset(20, 20));
     expect(

@@ -6,6 +6,7 @@ import 'package:kaneo_app/core/core.dart';
 
 import '../task/open_task.dart';
 import 'board_filters.dart';
+import 'board_picker_data.dart';
 
 class BoardToolbar extends ConsumerStatefulWidget implements PreferredSizeWidget {
   const BoardToolbar({
@@ -65,7 +66,10 @@ class _BoardToolbarState extends ConsumerState<BoardToolbar> {
     try {
       final projects = await runAction(
         context,
-        () => ref.read(projectsQuery(board.workspaceId).future),
+        () => boardPickerData(
+          ProviderScope.containerOf(context, listen: false),
+          projectsQuery(board.workspaceId),
+        ),
       );
       if (!mounted || !anchor.mounted || projects == null) return;
       final picked = await pickOption(
@@ -142,8 +146,9 @@ class _BoardToolbarState extends ConsumerState<BoardToolbar> {
         case 'assignee':
           final members = await runAction(
             context,
-            () => ref.read(
-              membersQuery((workspaceId: board.workspaceId, projectId: board.id)).future,
+            () => boardPickerData(
+              ProviderScope.containerOf(context, listen: false),
+              membersQuery((workspaceId: board.workspaceId, projectId: board.id)),
             ),
           );
           if (!mounted || !anchor.mounted || members == null) return;
@@ -177,7 +182,10 @@ class _BoardToolbarState extends ConsumerState<BoardToolbar> {
         case 'labels':
           final labels = await runAction(
             context,
-            () => ref.read(workspaceLabelsQuery(board.workspaceId).future),
+            () => boardPickerData(
+              ProviderScope.containerOf(context, listen: false),
+              workspaceLabelsQuery(board.workspaceId),
+            ),
           );
           if (!mounted || !anchor.mounted || labels == null) return;
           final selected = await pickLabels(

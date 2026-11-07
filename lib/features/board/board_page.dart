@@ -12,6 +12,7 @@ import 'board_move.dart';
 import 'board_orientation.dart';
 import 'board_filters.dart';
 import 'board_toolbar.dart';
+import 'board_picker_data.dart';
 
 class BoardPage extends ConsumerStatefulWidget {
   const BoardPage({super.key, required this.projectId});
@@ -199,8 +200,9 @@ class _BoardPageState extends ConsumerState<BoardPage> {
         case 'assignee':
           final members = await runAction(
             context,
-            () => ref.read(
-              membersQuery((workspaceId: board.workspaceId, projectId: board.id)).future,
+            () => boardPickerData(
+              ProviderScope.containerOf(context, listen: false),
+              membersQuery((workspaceId: board.workspaceId, projectId: board.id)),
             ),
           );
           if (!mounted || !anchor.mounted || members == null) return;
