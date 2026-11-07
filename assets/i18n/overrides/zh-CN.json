@@ -13,6 +13,10 @@
 		"task": {
 			"title": "任务"
 		},
+		"markdown": {
+			"imageFailed": "图片加载失败",
+			"linkFailed": "无法打开此链接"
+		},
 		"board": {
 			"columnCount_other": "{{count}} 列",
 			"taskCount_other": "{{count}} 个任务"

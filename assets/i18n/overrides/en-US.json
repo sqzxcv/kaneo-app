@@ -13,6 +13,10 @@
 		"task": {
 			"title": "Task"
 		},
+		"markdown": {
+			"imageFailed": "Image failed to load",
+			"linkFailed": "Couldn't open this link"
+		},
 		"board": {
 			"columnCount_one": "{{count}} column",
 			"columnCount_other": "{{count}} columns",
