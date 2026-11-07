@@ -69,12 +69,10 @@ void main() {
       find.descendant(of: first, matching: find.byTooltip('High')),
       size == wideSize ? findsOneWidget : findsNothing,
     );
-    for (final text in ['B Label', '0/1']) {
-      expect(
-        find.descendant(of: first, matching: find.text(text)),
-        size == wideSize ? findsOneWidget : findsNothing,
-      );
-    }
+    expect(
+      find.descendant(of: first, matching: find.text('B Label')),
+      size == wideSize ? findsOneWidget : findsNothing,
+    );
     expect(
       find.descendant(
         of: row('task-2'),
@@ -82,6 +80,38 @@ void main() {
       ),
       size == wideSize ? findsOneWidget : findsNothing,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  // KAN-68: a phone's list showed no progress. The owner decided it should, as the board does.
+  testBothLayouts('a parent row shows its subtask progress, and other rows show none', (
+    tester,
+    size,
+  ) async {
+    final server = FakeKaneo();
+    server.addTask(id: 'task-7', title: 'Second child');
+    server.addRelation('task-1', 'task-7');
+    server.tasks.firstWhere((t) => t['id'] == 'task-2')['status'] = 'done';
+    await openList(tester, size, server: server);
+    final progress = find.descendant(of: row('task-1'), matching: find.text('1/2'));
+    expect(progress, findsOneWidget);
+    expect(
+      find.descendant(of: row('task-1'), matching: find.byTooltip('Subtasks')),
+      findsOneWidget,
+    );
+    // Beside the title, inside the row.
+    final title = tester.getRect(
+      find.descendant(of: row('task-1'), matching: find.text('Set up the project')),
+    );
+    expect(tester.getRect(progress).left, greaterThanOrEqualTo(title.right));
+    expect(tester.getRect(row('task-1')).contains(tester.getCenter(progress)), isTrue);
+    for (final id in ['task-3', 'task-4', 'task-5', 'task-6']) {
+      expect(
+        find.descendant(of: row(id), matching: find.textContaining(RegExp(r'^\d+/\d+$'))),
+        findsNothing,
+        reason: id,
+      );
+    }
     expect(tester.takeException(), isNull);
   });
 

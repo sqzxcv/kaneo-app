@@ -130,7 +130,8 @@ class BoardListRow extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (wide && (counts?.total ?? 0) > 0) ...[
+                          // On every window, as on the board's cards (KAN-68).
+                          if ((counts?.total ?? 0) > 0) ...[
                             const SizedBox(width: 8),
                             Tooltip(
                               message: context.t('mobile:taskDetail.subtasks.title'),
