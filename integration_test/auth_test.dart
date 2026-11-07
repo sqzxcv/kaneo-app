@@ -36,6 +36,7 @@ void main() {
     final storage = SecureSessionStorage(key: _storageKey);
     // The separate "save" and "restore" invocations prove that the session survives process exit.
     if (_phase == 'restore' || (_phase == 'restart' && await storage.read() != null)) {
+      debugPrint('D_AUTH_PHASE restore');
       final container = await bootstrap(sessionStorage: storage);
       addTearDown(container.dispose);
       expect(
@@ -53,6 +54,7 @@ void main() {
       expect(await storage.read() == null, isTrue);
       return;
     }
+    debugPrint('D_AUTH_PHASE save');
     final previous = await storage.read();
     expect(
       previous == null,
@@ -81,6 +83,7 @@ void main() {
     expect(container.read(sessionProvider) != null, isTrue, reason: 'Password sign-in failed');
     final stored = await SecureSessionStorage(key: _storageKey).read();
     expect(stored != null && stored.token == container.read(sessionProvider)?.token, isTrue);
+    debugPrint('D_AUTH_STORAGE password session stored');
     await container.read(sessionProvider.notifier).signOut();
     await tester.pumpAndSettle();
     expect(await storage.read() == null, isTrue);
@@ -102,6 +105,7 @@ void main() {
           CredentialType.apiKey,
       isTrue,
     );
+    debugPrint('D_AUTH_STORAGE API key stored');
     if (_phase != 'save' && _phase != 'restart') {
       await container.read(sessionProvider.notifier).signOut();
     }
