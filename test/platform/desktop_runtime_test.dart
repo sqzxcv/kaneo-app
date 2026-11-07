@@ -132,6 +132,16 @@ void main() {
     expect(host.notices, isEmpty);
   });
 
+  test('structured server events show the task title when legacy text is absent', () async {
+    await start();
+    data = [
+      ...data,
+      notice('structured').copyWith(content: null, eventData: {'taskTitle': 'Release checklist'}),
+    ];
+    await runtime.check();
+    expect(host.notices.single.body, 'Release checklist');
+  });
+
   test('large batches become a summary and four recent notifications', () async {
     await start();
     data = [...data, for (var i = 0; i < 9; i++) notice('new-$i')];

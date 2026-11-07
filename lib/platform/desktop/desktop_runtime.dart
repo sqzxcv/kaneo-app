@@ -139,10 +139,12 @@ class DesktopRuntime {
         await _show(generation, title: 'Kaneo', body: summary(unread.length - 4));
       }
       for (final notice in unread.length > 5 ? unread.skip(unread.length - 4) : unread) {
+        final data = notice.eventData;
+        final taskTitle = data is Map ? data['taskTitle'] : null;
         await _show(
           generation,
           title: notice.title?.trim().isNotEmpty == true ? notice.title! : 'Kaneo',
-          body: notice.content ?? fallbackBody,
+          body: notice.content ?? (taskTitle is String ? taskTitle : fallbackBody),
           taskId: notice.resourceType == 'task' ? notice.resourceId : null,
         );
       }
