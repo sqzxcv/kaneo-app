@@ -38,9 +38,9 @@ class BoardListRow extends StatelessWidget {
     };
     final labels = task.labels ?? <TaskLabel>[];
     final counts = task.subtaskCounts;
-    return GestureDetector(
-      onSecondaryTapDown: (details) => onMenu?.call(context, task, details.globalPosition),
-      onLongPressStart: (details) => onMenu?.call(context, task, details.globalPosition),
+    final onMenu = this.onMenu;
+    return MenuGestures(
+      onMenu: onMenu == null ? null : (position) => onMenu(context, task, position),
       child: Material(
         color: colors.background,
         child: InkWell(

@@ -38,13 +38,9 @@ class BoardCard extends StatelessWidget {
       'low' => colors.priorityLow,
       _ => colors.chipMuted,
     };
-    return GestureDetector(
-      onSecondaryTapDown: onMenu == null
-          ? null
-          : (details) => onMenu!(context, task, details.globalPosition),
-      onLongPressStart: onMenu == null
-          ? null
-          : (details) => onMenu!(context, task, details.globalPosition),
+    final onMenu = this.onMenu;
+    return MenuGestures(
+      onMenu: onMenu == null ? null : (position) => onMenu(context, task, position),
       child: Material(
         color: isFinal ? colors.boardCardDone : colors.boardCard,
         shape: RoundedRectangleBorder(

@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../layout/breakpoints.dart';
@@ -59,6 +60,70 @@ Future<T?> showActionMenu<T>(
   );
 }
 
+/// Calls [onMenu] with the pointer's global position on a right-click, or on a long press on a touch
+/// screen. A null [onMenu] turns both off.
+///
+/// A long press is over once it has asked for the menu, so the next one on [child] starts afresh
+/// even if this press's end never arrives. Otherwise only the menu's route ends it, by cancelling the
+/// pointer, and if that cancel is lost, as integration tests lose it, [child] never long-presses
+/// again.
+class MenuGestures extends StatelessWidget {
+  const MenuGestures({super.key, required this.onMenu, required this.child});
+
+  final ValueChanged<Offset>? onMenu;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final onMenu = this.onMenu;
+    return RawGestureDetector(
+      gestures: {
+        if (onMenu != null) ...{
+          TapGestureRecognizer: GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+            () => TapGestureRecognizer(debugOwner: this),
+            (recognizer) =>
+                recognizer.onSecondaryTapDown = (details) => onMenu(details.globalPosition),
+          ),
+          _MenuLongPress: GestureRecognizerFactoryWithHandlers<_MenuLongPress>(
+            () => _MenuLongPress(debugOwner: this),
+            (recognizer) =>
+                recognizer.onLongPressStart = (details) => onMenu(details.globalPosition),
+          ),
+        },
+      },
+      semantics: onMenu == null ? null : _MenuSemantics(onMenu),
+      child: child,
+    );
+  }
+}
+
+/// Lets screen readers long-press too, opening the menu at the middle of what they pressed.
+class _MenuSemantics extends SemanticsGestureDelegate {
+  const _MenuSemantics(this.onMenu);
+
+  final ValueChanged<Offset> onMenu;
+
+  @override
+  void assignSemantics(RenderSemanticsGestureHandler renderObject) {
+    renderObject.onLongPress = () =>
+        onMenu(renderObject.localToGlobal(renderObject.size.center(Offset.zero)));
+  }
+}
+
+/// A long press that ends itself as soon as it has started, the way the menu's route would end it.
+class _MenuLongPress extends LongPressGestureRecognizer {
+  _MenuLongPress({super.debugOwner});
+
+  @override
+  void didExceedDeadline() {
+    final pointer = primaryPointer!;
+    super.didExceedDeadline();
+    if (state == GestureRecognizerState.possible && primaryPointer == pointer) {
+      handleEvent(PointerCancelEvent(pointer: pointer));
+    }
+  }
+}
+
 /// Opens a menu on [child] with a right-click, or a long press on a touch screen, at the pointer.
 class ContextMenuRegion<T> extends StatelessWidget {
   const ContextMenuRegion({
@@ -80,10 +145,6 @@ class ContextMenuRegion<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onSecondaryTapDown: (details) => _open(context, details.globalPosition),
-      onLongPressStart: (details) => _open(context, details.globalPosition),
-      child: child,
-    );
+    return MenuGestures(onMenu: (position) => _open(context, position), child: child);
   }
 }
