@@ -102,21 +102,16 @@ void main() {
     };
     _pages.forEach((location, page) {
       sizes.forEach((name, size) {
-        testWidgets(
-          '$location on $name',
-          (tester) async {
-            await pumpKaneoApp(tester, size: size, location: location);
-            expect(page.shows, findsWidgets);
-            if (isWideSize(size)) {
-              expectWide();
-            } else {
-              page.tabs ? expectNarrowWithTabs() : expectNarrowWithoutTabs();
-            }
-            expect(tester.takeException(), isNull);
-          },
-          // KAN-53: the board's toolbar overflows on a page this narrow.
-          skip: location == AppRoutes.board(FakeKaneo.projectId) && size == const Size(600, 600),
-        );
+        testWidgets('$location on $name', (tester) async {
+          await pumpKaneoApp(tester, size: size, location: location);
+          expect(page.shows, findsWidgets);
+          if (isWideSize(size)) {
+            expectWide();
+          } else {
+            page.tabs ? expectNarrowWithTabs() : expectNarrowWithoutTabs();
+          }
+          expect(tester.takeException(), isNull);
+        });
       });
     });
   });

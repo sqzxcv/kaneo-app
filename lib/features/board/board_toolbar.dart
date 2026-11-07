@@ -220,16 +220,24 @@ class _BoardToolbarState extends ConsumerState<BoardToolbar> {
   );
 
   @override
-  Widget build(BuildContext context) => AppBar(
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, bounds) =>
+        _bar(context, inlineSearch: widget.wide && bounds.maxWidth >= 700),
+  );
+
+  Widget _bar(BuildContext context, {required bool inlineSearch}) => AppBar(
     toolbarHeight: widget.wide ? 56 : 48,
     leadingWidth: 40,
     leading: _button(
+      key: _search && !inlineSearch ? const ValueKey('board-search-toggle') : null,
       tooltip: context.t('mobile:board.back'),
-      icon: LucideIcons.arrowLeft,
-      onPressed: () => context.canPop() ? context.pop() : context.go(AppRoutes.home),
+      icon: _search && !inlineSearch ? LucideIcons.chevronLeft : LucideIcons.arrowLeft,
+      onPressed: _search && !inlineSearch
+          ? () => setState(() => _search = false)
+          : () => context.canPop() ? context.pop() : context.go(AppRoutes.home),
     ),
     titleSpacing: 0,
-    title: _search && !widget.wide
+    title: _search && !inlineSearch
         ? _searchField()
         : Row(
             children: [
@@ -255,12 +263,12 @@ class _BoardToolbarState extends ConsumerState<BoardToolbar> {
                   ),
                 ),
               ),
-              if (widget.wide && widget.board != null && !widget.filters.active)
+              if (inlineSearch && widget.board != null && !widget.filters.active)
                 Text(
                   context.t('app:board.columnCount', {'count': widget.board!.columns.length}),
                   style: TextStyle(fontSize: 11, color: context.colors.mutedForeground),
                 ),
-              if (widget.wide) ...[
+              if (inlineSearch) ...[
                 const SizedBox(width: 16),
                 SizedBox(width: 210, child: _searchField()),
               ],
@@ -272,7 +280,7 @@ class _BoardToolbarState extends ConsumerState<BoardToolbar> {
         icon: widget.listView ? LucideIcons.columns3 : LucideIcons.list,
         onPressed: widget.onViewChanged,
       ),
-      if (!widget.wide)
+      if (!inlineSearch && !_search)
         _button(
           key: const ValueKey('board-search-toggle'),
           tooltip: context.t('mobile:board.filterTasks'),
@@ -300,16 +308,18 @@ class _BoardToolbarState extends ConsumerState<BoardToolbar> {
           onPressed: () => widget.onFilters(const BoardFilters()),
         ),
       ],
-      _button(
-        tooltip: context.t('mobile:board.refresh'),
-        icon: LucideIcons.refreshCw,
-        onPressed: widget.busy ? null : widget.onRefresh,
-      ),
-      _button(
-        tooltip: context.t('mobile:board.newTask'),
-        icon: LucideIcons.plus,
-        onPressed: () => openNewTask(context, projectId: widget.projectId),
-      ),
+      if (inlineSearch || !_search) ...[
+        _button(
+          tooltip: context.t('mobile:board.refresh'),
+          icon: LucideIcons.refreshCw,
+          onPressed: widget.busy ? null : widget.onRefresh,
+        ),
+        _button(
+          tooltip: context.t('mobile:board.newTask'),
+          icon: LucideIcons.plus,
+          onPressed: () => openNewTask(context, projectId: widget.projectId),
+        ),
+      ],
     ],
   );
 }
