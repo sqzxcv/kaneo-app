@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/core.dart';
 import 'task_description.dart';
 import 'task_properties.dart';
+import 'task_relations_view.dart';
 import 'task_title.dart';
 
 /// From this width a task shows its properties in a column of their own, as the web app's panel
@@ -111,6 +112,7 @@ class _TaskBody extends StatefulWidget {
 class _TaskBodyState extends State<_TaskBody> {
   final _title = GlobalKey();
   final _description = GlobalKey();
+  final _relations = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -118,6 +120,8 @@ class _TaskBodyState extends State<_TaskBody> {
     final title = TaskTitle(key: _title, task: task);
     final description = TaskDescription(key: _description, task: task);
     final properties = TaskProperties(task: task);
+    final parent = TaskParentLink(task: task);
+    final relations = TaskRelationSections(key: _relations, task: task);
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < taskTwoColumnsMinWidth) {
@@ -126,11 +130,14 @@ class _TaskBodyState extends State<_TaskBody> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                parent,
                 title,
                 const SizedBox(height: 12),
                 properties,
                 const SizedBox(height: 16),
                 description,
+                const SizedBox(height: 24),
+                relations,
               ],
             ),
           );
@@ -144,7 +151,14 @@ class _TaskBodyState extends State<_TaskBody> {
                 child: ContentWidth(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [title, const SizedBox(height: 16), description],
+                    children: [
+                      parent,
+                      title,
+                      const SizedBox(height: 16),
+                      description,
+                      const SizedBox(height: 28),
+                      relations,
+                    ],
                   ),
                 ),
               ),

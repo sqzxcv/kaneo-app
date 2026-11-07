@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/misc.dart' show KeepAliveLink;
 
 import '../../core/core.dart';
 import '../board/board_data.dart';
+import 'task_relations.dart';
 
 /// The labels on a task. Each is the task's own copy of a workspace label.
 final taskLabelsQuery = cachedQueryFamily<List<Label>, String>(
@@ -251,6 +252,67 @@ class TaskEdits {
     });
   }
 
+  /// Ticks off [subtask] of this task, or undoes that. The list shows it at once and goes back if it
+  /// can't be saved. Resolves once that is settled.
+  Future<void> setSubtaskDone(RelatedTask subtask, bool done) async {
+    if (!_ref.mounted) return;
+    final workspaceId = _ref.read(taskQuery(taskId)).value?.workspaceId;
+    _showSubtaskDone(subtask.id, done);
+    // The subtask's own edits, because its changes have to go out one at a time as well.
+    final saved = await _ref
+        .read(taskEditsProvider(subtask.id))
+        ._setDone(done, projectId: subtask.projectId, workspaceId: workspaceId);
+    if (!saved) _showSubtaskDone(subtask.id, !done);
+  }
+
+  void _showSubtaskDone(String subtaskId, bool done) {
+    if (!_ref.mounted) return;
+    final query = taskRelationsQuery(taskId);
+    if (!_ref.read(query.exists)) return;
+    final relations = _ref.read(query).value;
+    if (relations == null) return;
+    _ref.read(query.notifier).setData(relationsWithDone(relations, subtaskId, done));
+  }
+
+  /// Moves this task to the column [done] calls for, read afresh because a project's columns change.
+  /// Resolves to whether it was saved, and says why not otherwise.
+  ///
+  /// This task may not be loaded, as with a subtask ticked off from its parent, so it takes the
+  /// project and the workspace from whoever asks.
+  Future<bool> _setDone(bool done, {required String projectId, required String? workspaceId}) {
+    final saved = Completer<bool>();
+    final api = _ref.read(kaneoApiProvider);
+    _enqueue(() async {
+      final String? status;
+      try {
+        status = completionStatus(await api.columns(projectId), done: done);
+        if (status != null) await api.updateStatus(taskId, status);
+      } catch (error) {
+        _report(error);
+        saved.complete(false);
+        return;
+      }
+      if (status == null) {
+        if (_ref.mounted) {
+          final message = _ref.read(i18nProvider).t('tasks:subtasks.noCompletionColumn');
+          showGlobalToast(message, kind: ToastKind.error);
+        }
+        saved.complete(false);
+        return;
+      }
+      saved.complete(true);
+      if (!_ref.mounted) return;
+      final task = _ref.read(taskQuery(taskId)).value;
+      if (task != null) _publish(task.copyWith(status: status));
+      _ref.read(savedTaskProvider.notifier).saved(taskId);
+      await _refreshIfOpen(boardQuery(projectId));
+      if (workspaceId != null && _ref.mounted) {
+        await _refreshIfOpen(assignedTasksQuery(workspaceId));
+      }
+    });
+    return saved.future;
+  }
+
   void _edit(
     Task Function(Task task) change,
     Future<void> Function(KaneoApi api) send, {
@@ -273,6 +335,7 @@ class TaskEdits {
         return;
       }
       if (!_ref.mounted) return;
+      _ref.read(savedTaskProvider.notifier).saved(taskId);
       // The board shows a parent's progress, which depends on the status of its children.
       if (refreshBoard) await _refreshIfOpen(boardQuery(after.projectId));
       final workspaceId = after.workspaceId;

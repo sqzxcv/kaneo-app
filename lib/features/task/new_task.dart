@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/core.dart';
 import 'task_edits.dart';
+import 'task_relations.dart';
 
 /// The status a new task starts in: [preferred] if the project has it, otherwise its first open
 /// column, or `planned` if it has none. A slug two columns share can't pick a column, as in the web
@@ -89,6 +90,48 @@ class NewTasks {
       _refreshIfOpen(boardQuery(projectId));
       _refreshIfOpen(assignedTasksQuery(workspaceId));
       return added;
+    } finally {
+      keepAlive.close();
+    }
+  }
+
+  /// Adds a task called [title] under [parent], with nothing else set, as the web app does: in the
+  /// parent's project, planned if the parent is, and otherwise in the first open column.
+  ///
+  /// Throws if the task wasn't created, and then nothing has changed. Once it exists it must not be
+  /// created again, so a link that can't be made doesn't throw. It resolves to whether it was made.
+  Future<bool> createSubtask({required Task parent, required String title}) async {
+    // It has to finish even if the task closes while it is under way.
+    final keepAlive = _ref.keepAlive();
+    try {
+      final api = _ref.read(kaneoApiProvider);
+      final projectId = parent.projectId;
+      final preferred = parent.status == statusPlanned ? statusPlanned : null;
+      final columns = preferred != null
+          ? const <ProjectColumn>[]
+          : _ref.read(columnsQuery(projectId)).value ?? await api.columns(projectId);
+      final task = await api.createTask(
+        projectId,
+        CreateTaskBody(
+          title: title,
+          description: '',
+          priority: priorities.first,
+          status: initialTaskStatus(columns, preferred),
+        ),
+      );
+      var linked = true;
+      try {
+        await api.createRelation(parent.id, task.id, relationSubtask);
+      } catch (_) {
+        linked = false;
+      }
+      if (!_ref.mounted) return linked;
+      // A board shows it among the parent's children, and the parent's progress.
+      _refreshIfOpen(boardQuery(projectId));
+      _refreshIfOpen(projectRelationsQuery(projectId));
+      final relations = taskRelationsQuery(parent.id);
+      if (_ref.read(relations.exists)) await _ref.read(relations.notifier).refresh();
+      return linked;
     } finally {
       keepAlive.close();
     }
