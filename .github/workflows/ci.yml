@@ -23,6 +23,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
       - run: flutter analyze
       - run: flutter test
 
@@ -41,6 +42,12 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-unsigned-${{ github.sha }}
+          path: build/app/outputs/flutter-apk/*release.apk
+          if-no-files-found: error
+          retention-days: 3
 
   build-ios:
     runs-on: macos-latest
@@ -53,6 +60,13 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build ios --release --no-codesign
+      - run: tar -czf build/ios/ios-unsigned.tar.gz -C build/ios/iphoneos Runner.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-${{ github.sha }}
+          path: build/ios/ios-unsigned.tar.gz
+          if-no-files-found: error
+          retention-days: 3
 
   build-macos:
     runs-on: macos-latest

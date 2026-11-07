@@ -4,6 +4,14 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val signingFields = listOf("KANEO_ANDROID_KEYSTORE", "KANEO_ANDROID_STORE_PASSWORD",
+    "KANEO_ANDROID_KEY_ALIAS", "KANEO_ANDROID_KEY_PASSWORD")
+val releaseSigning = signingFields.associateWith { System.getenv(it).orEmpty() }
+val hasReleaseSigning = releaseSigning.values.any { it.isNotEmpty() }
+if (hasReleaseSigning && releaseSigning.values.any { it.isEmpty() }) {
+    throw GradleException("Incomplete release signing configuration; use .github/scripts/mobile_release.py")
+}
+
 android {
     namespace = "app.kaneo.kaneo_app"
     // flutter_local_notifications needs 37.
@@ -31,11 +39,22 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseSigning.getValue("KANEO_ANDROID_KEYSTORE"))
+                storePassword = releaseSigning.getValue("KANEO_ANDROID_STORE_PASSWORD")
+                keyAlias = releaseSigning.getValue("KANEO_ANDROID_KEY_ALIAS")
+                keyPassword = releaseSigning.getValue("KANEO_ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // CI can compile an unsigned package. Distribution requires the administrator's key;
+            // a missing key must never silently produce a package signed with the debug identity.
+            signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else null
         }
     }
 }
