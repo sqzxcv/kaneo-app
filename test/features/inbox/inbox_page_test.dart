@@ -412,6 +412,14 @@ void main() {
       _expectUnread(2);
     });
 
+    // KAN-61: it filled its row in the sidebar from top to bottom. The tabs have Material's badge.
+    testWidgets('in the sidebar is a small pill, not as tall as its row', (tester) async {
+      await pumpKaneoApp(tester, server: _server(), size: wideSize);
+      final badge = tester.getSize(find.byKey(inboxUnreadKey));
+      expect(badge.height, 18);
+      expect(badge.width, lessThan(32));
+    });
+
     testBothLayouts('is gone with nothing unread', (tester, size) async {
       final server = _server();
       for (final notification in server.notifications) {

@@ -156,7 +156,9 @@ class _UnreadCount extends ConsumerWidget {
       label: context.t('mobile:nav.inboxUnread', {'count': count}),
       child: Container(
         key: inboxUnreadKey,
-        constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+        // A height of its own, or its alignment has it fill the row from top to bottom.
+        height: 18,
+        constraints: const BoxConstraints(minWidth: 18),
         padding: const EdgeInsets.symmetric(horizontal: 4),
         alignment: Alignment.center,
         decoration: BoxDecoration(color: c.foreground, borderRadius: BorderRadius.circular(9)),
