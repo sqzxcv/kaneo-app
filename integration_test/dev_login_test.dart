@@ -1,5 +1,5 @@
-// Starts the real app against the local Kaneo, signs in with dev.env and opens every placeholder
-// page. Needs `tool/local_kaneo.sh start` and a device from the queue:
+// Starts the real app against the local Kaneo, signs in with dev.env and opens every page. Needs
+// `tool/local_kaneo.sh start` and a device from the queue:
 //
 //     tool/with_device.sh --boot "iPhone 17" flutter test integration_test -d "iPhone 17" \
 //       --dart-define-from-file=$HOME/.config/kaneo-app/dev.env
@@ -13,6 +13,7 @@ import 'package:kaneo_app/app.dart';
 import 'package:kaneo_app/bootstrap.dart';
 import 'package:kaneo_app/core/core.dart';
 import 'package:kaneo_app/features/auth/login_page.dart';
+import 'package:kaneo_app/features/inbox/inbox_page.dart';
 
 /// Pumps until [finder] matches. The server is real, so `pumpAndSettle` alone is not enough.
 Future<void> waitFor(
@@ -55,7 +56,7 @@ void main() {
     expect(find.text('Second project'), findsWidgets);
 
     final router = container.read(routerProvider);
-    final notice = find.text(container.read(i18nProvider).t('app:placeholder.notice'));
+    final i18n = container.read(i18nProvider);
 
     // The board, from the server.
     router.push(AppRoutes.board(config.projectId));
@@ -75,14 +76,21 @@ void main() {
 
     // The new-task page.
     router.push(AppRoutes.newTask(projectId: config.projectId));
-    await waitFor(tester, find.text(container.read(i18nProvider).t('mobile:board.newTask')));
+    await waitFor(tester, find.text(i18n.t('mobile:board.newTask')));
     router.pop();
     await tester.pump(const Duration(milliseconds: 500));
 
     // The other pages of the shell.
     router.go(AppRoutes.inbox);
-    await waitFor(tester, find.text(container.read(i18nProvider).t('mobile:nav.inbox')));
-    await waitFor(tester, notice);
+    await waitFor(tester, find.byType(InboxPage));
+    // The account is shared, so what is in the inbox is read from the server, not assumed.
+    final inbox = await api.notifications(workspaceId: config.workspaceId);
+    await waitFor(
+      tester,
+      inbox.isEmpty
+          ? find.text(i18n.t('mobile:inbox.empty.title'))
+          : find.byKey(ValueKey(inbox.first.id)),
+    );
     await tester.pump(const Duration(seconds: 1));
 
     final assigned = await api.assignedTasks(config.workspaceId);
@@ -106,7 +114,7 @@ void main() {
 
     // A failure other than 401 is shown in place, as something readable.
     router.push(AppRoutes.board('does-not-exist'));
-    await waitFor(tester, find.text(container.read(i18nProvider).t('mobile:ui.loadFailed')));
+    await waitFor(tester, find.text(i18n.t('mobile:ui.loadFailed')));
     expect(find.byType(LoginPage), findsNothing);
     expect(container.read(sessionProvider), isNotNull);
     router.pop();
@@ -115,10 +123,9 @@ void main() {
     // Switching language on a running app, with plurals.
     await container.read(languageChoiceProvider.notifier).select('zh-CN');
     await tester.pump(const Duration(milliseconds: 500));
-    router.push(AppRoutes.board(config.projectId));
-    await waitFor(tester, find.text('${board.columns.length} 列'));
-    router.pop();
-    await tester.pump(const Duration(milliseconds: 500));
+    // On every layout, unlike the board's column count. The account is shared, so any number will do.
+    router.go(AppRoutes.myTasks);
+    await waitFor(tester, find.textContaining(RegExp(r'^已指派 \d+ 个$')));
     await container.read(languageChoiceProvider.notifier).select(defaultLocale);
 
     // A key the server rejects returns to the login page.
