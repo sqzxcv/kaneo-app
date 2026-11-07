@@ -662,10 +662,11 @@ class FakeKaneo implements HttpClientAdapter {
     }
   }
 
-  /// Closes the sockets that are open from the server's end. Set [unreachable] too for a lost network.
-  void dropSockets({int? code, String? reason}) {
+  /// Closes the sockets that are open from the server's end, all of them or those on [path]. Set
+  /// [unreachable] too for a lost network.
+  void dropSockets({int? code, String? reason, String? path}) {
     for (final socket in sockets) {
-      if (socket.isOpen) socket._drop(code, reason);
+      if (socket.isOpen && (path == null || socket.path == path)) socket._drop(code, reason);
     }
   }
 

@@ -328,6 +328,83 @@ void main() {
       expect(tester.takeException(), isNull);
     }, timeout: const Timeout(Duration(minutes: 8)));
   }
+
+  // KAN-59. No board is open below this task, so it has its project's socket to itself.
+  testWidgets('a task opened away from its board follows changes made elsewhere', (tester) async {
+    final config = DevConfig.fromEnvironment();
+    final target = Uri.parse(config.serverUrl);
+    expect(['localhost', '127.0.0.1', '::1'], contains(target.host), reason: 'Local Kaneo only.');
+    if (Platform.isMacOS) {
+      await windowManager.ensureInitialized();
+      await windowManager.setSize(const Size(1366, 1024));
+    }
+    final container = await bootstrap(sessionStorage: MemorySessionStorage());
+    addTearDown(container.dispose);
+    await container.read(languageChoiceProvider.notifier).select(defaultLocale);
+
+    final session = await container
+        .read(authenticationProvider)
+        .withPassword(config.serverUrl, _email, _password);
+    final web = KaneoApi(
+      ApiClient(
+        session: () => session,
+        i18n: container.read(i18nProvider),
+        onSessionExpired: (_) {},
+      ),
+      container.read(i18nProvider),
+    );
+    final stamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
+    final project = await web.createProject(
+      name: 'A-realtime-task-$stamp',
+      workspaceId: config.workspaceId,
+      icon: 'Layout',
+      slug: 'ART${stamp.toUpperCase()}',
+    );
+    addTearDown(() => web.deleteProject(project.id));
+    final task = await web.createTask(
+      project.id,
+      CreateTaskBody(
+        title: 'A On its own',
+        description: '',
+        priority: 'no-priority',
+        status: (await web.columns(project.id)).first.slug,
+      ),
+    );
+
+    await container.read(sessionProvider.notifier).signIn(session);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const KaneoApp()),
+    );
+    container.read(routerProvider).go(AppRoutes.task(task.id));
+    final title = find.byKey(const ValueKey('task-title'));
+    expect(await _until(tester, () => title.evaluate().isNotEmpty, _seconds(30)), isTrue);
+    // Long enough for the socket to be open.
+    await _wait(tester, _seconds(1));
+
+    await web.updateTitle(task.id, 'A Renamed on the web');
+    await _expectWithin(
+      tester,
+      'KAN59_title',
+      _seconds(5),
+      () => tester.widget<TextField>(title).controller!.text == 'A Renamed on the web',
+    );
+    await web.createComment(task.id, 'A Said on the web');
+    await _expectWithin(
+      tester,
+      'KAN59_comment',
+      _seconds(5),
+      () => find.text('A Said on the web').evaluate().isNotEmpty,
+    );
+    expect(
+      container.read(boardQuery(project.id).exists),
+      isFalse,
+      reason: 'Nobody needs the board here.',
+    );
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(minutes: 3)));
 }
 
 Duration _seconds(int seconds) => Duration(seconds: seconds);

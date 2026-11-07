@@ -75,7 +75,10 @@ class _Fresh {
   final List<Label>? labels;
 }
 
-/// Keeps an open board in step with what happens to its project elsewhere.
+/// Keeps an open board, and the tasks open in its project, in step with what happens elsewhere. They
+/// all listen to this, which makes one socket for a project, whichever of them opened first.
+///
+/// Without a board there are only the open tasks to read again. See [_boardOpen].
 ///
 /// Events of one moment are handled together, and each brings only the cards it is about up to date,
 /// since a board can be too large to read for every change. Only what can't be known otherwise reads
@@ -122,22 +125,35 @@ class BoardSync {
 
   AsyncNotifierProvider<CachedQuery<BoardData>, BoardData> get _query => boardQuery(projectId);
 
+  /// A task can be open with no board around, as from the inbox. Reading the query would load the
+  /// whole board then, for nobody, so everything to do with the board asks this first.
+  bool get _boardOpen => _ref.read(_query.exists);
+
   void _dispose() {
     _disposed = true;
     _timer?.cancel();
   }
 
   /// The first socket usually opens while the board is loading, and so has missed nothing that matters.
-  /// After that there has been a time without one, and no way to tell what happened in it.
+  /// A task's opens just after the task was read, which comes to the same. After that there has been a
+  /// time without one, and no way to tell what happened in it.
   void _opened() {
     final first = !_hasOpened;
     _hasOpened = true;
+    if (!_boardOpen) {
+      if (!first) _refreshOpenTasks();
+      return;
+    }
     if (first && _ref.read(_query).isLoading) return;
     _pending.reload = true;
     _arm();
   }
 
   void _revoked() {
+    if (!_boardOpen) {
+      _refreshOpenTasks();
+      return;
+    }
     _pending.reload = true;
     _arm();
   }
@@ -145,7 +161,9 @@ class BoardSync {
   void _onEvent(RealtimeEvent event) {
     final id = event.taskId;
     // The pages of a board being read can miss a task when tasks come, go or trade places meanwhile.
-    if (_boardChanges.contains(event.type) && _ref.read(_query).isLoading) _pending.reload = true;
+    if (_boardChanges.contains(event.type) && _boardOpen && _ref.read(_query).isLoading) {
+      _pending.reload = true;
+    }
     switch (event.type) {
       case 'TASK_UPDATED':
       case 'TASK_CREATED':
@@ -214,7 +232,7 @@ class BoardSync {
   Future<void> _flush() async {
     _timer = null;
     if (_disposed || _working || _pending.isEmpty) return;
-    if (saving() || _dragHolds || _ref.read(_query).isLoading) {
+    if (_boardOpen && (saving() || _dragHolds || _ref.read(_query).isLoading)) {
       _arm();
       return;
     }
@@ -243,9 +261,14 @@ class BoardSync {
   }
 
   Future<void> _apply(_Changes changes) async {
-    final notifier = _ref.read(_query.notifier);
     final reads = {...changes.tasks}..removeAll(changes.deleted);
     final labels = {...changes.labels}..removeAll(changes.deleted);
+    if (!_boardOpen) {
+      if (changes.reload) _refreshOpenTasks();
+      _refreshOpenDetails(changes, reads, labels);
+      return;
+    }
+    final notifier = _ref.read(_query.notifier);
     final current = _ref.read(_query).value;
     final reload =
         changes.reload ||
@@ -264,6 +287,11 @@ class BoardSync {
         ])).nonNulls,
       );
       if (_disposed) return;
+      // The board closed under an open task meanwhile, so what was read is of no use to it.
+      if (!_boardOpen) {
+        _refreshOpenDetails(changes, reads, labels);
+        return;
+      }
       // A change on this device got ahead of these reads, or the board was read again meanwhile.
       if (notifier.revision != revision) {
         _pending.add(changes);
@@ -352,7 +380,21 @@ class BoardSync {
     return _ref.read(members).value?.where((m) => m.id == userId).firstOrNull?.image;
   }
 
-  /// A task open over the board, and whatever else is showing this project's data.
+  /// There's no telling what happened to the tasks that are open, in this project or another, so
+  /// they all read again. One that's being saved has an event of its own to come.
+  void _refreshOpenTasks() {
+    _ref
+        .read(openQueriesProvider)
+        .refresh(
+          where: (key) => key.startsWith('task/')
+              ? !_isSaving(key.substring('task/'.length))
+              : key.startsWith('task-labels/') ||
+                    key.startsWith('task-relations/') ||
+                    key.startsWith('task-activities/'),
+        );
+  }
+
+  /// A task that's open, and whatever else is showing this project's data.
   void _refreshOpenDetails(_Changes changes, Set<String> reads, Set<String> labels) {
     for (final id in reads) {
       if (!_isSaving(id)) _refreshIfOpen(taskQuery(id));
@@ -369,16 +411,14 @@ class BoardSync {
     for (final id in changes.linked) {
       _refreshIfOpen(taskRelationsQuery(id));
     }
-    final workspaceId = _ref.read(_query).value?.workspaceId;
+    // These are looked for by key, because a task on its own doesn't have the board's workspace.
+    final open = _ref.read(openQueriesProvider);
     if (changes.project) {
       _refreshIfOpen(columnsQuery(projectId));
-      if (workspaceId != null) {
-        _refreshIfOpen(projectsQuery(workspaceId));
-        _refreshIfOpen(allProjectsQuery(workspaceId));
-      }
+      open.refresh(where: (key) => key.startsWith('projects/') || key.startsWith('projects-all/'));
     }
-    if (changes.members && workspaceId != null) {
-      _refreshIfOpen(membersQuery((workspaceId: workspaceId, projectId: projectId)));
+    if (changes.members) {
+      open.refresh(where: (key) => key.startsWith('members/') && key.endsWith('/$projectId'));
     }
   }
 
@@ -387,7 +427,7 @@ class BoardSync {
   }
 }
 
-/// Lives as long as the board page that watches it, and reconnects by itself.
+/// Lives as long as a board page or an open task of the project watches it, and reconnects by itself.
 final boardSyncProvider = Provider.autoDispose.family<BoardSync, String>((ref, projectId) {
   final sync = BoardSync._(ref, projectId);
   ref.onDispose(sync._dispose);

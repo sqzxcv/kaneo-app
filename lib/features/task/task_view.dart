@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/core.dart';
+import '../realtime/board_sync.dart';
 import 'task_actions.dart';
 import 'task_activity_view.dart';
 import 'task_description.dart';
@@ -29,6 +30,9 @@ class TaskView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final query = taskQuery(taskId);
     final value = ref.watch(query);
+    // Keeps this up to date wherever it was opened from. Over its board, that's the board's socket.
+    final projectId = value.value?.projectId;
+    if (projectId != null) ref.watch(boardSyncProvider(projectId));
     return Scaffold(
       appBar: _TaskBar(task: value.value, onClose: onClose),
       body: SafeArea(
