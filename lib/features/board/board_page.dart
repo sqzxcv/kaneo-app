@@ -60,12 +60,17 @@ class _BoardPageState extends ConsumerState<BoardPage> {
     showArchived: _showArchived,
   );
 
-  void _moveVisible(String id, String status, int index) {
+  Future<void> _moveVisible(String id, String status, int index) async {
+    // The board showed the drop after any earlier one, so place it once that one is in.
+    while (_saving != null) {
+      await _saving;
+    }
+    if (!mounted) return;
     final board = ref.read(boardQuery(widget.projectId)).value;
     if (board == null) return;
     final full = _expanded(board).columns.firstWhere((c) => c.slug == status);
     final shown = _visible(board).columns.firstWhere((c) => c.slug == status);
-    _move(id, status, unfilteredDropIndex(full, shown, index));
+    await _move(id, status, unfilteredDropIndex(full, shown, index));
   }
 
   /// Marks a move or card edit as saving, until the returned completer completes.

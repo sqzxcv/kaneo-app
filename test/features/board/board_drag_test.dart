@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kaneo_app/core/core.dart';
 import 'package:kaneo_app/features/board/board_card.dart';
+import 'package:kaneo_app/features/board/board_motion.dart';
 
 import '../../support/test_app.dart';
 
@@ -277,7 +278,9 @@ void main() {
     final first = await pickUpCard(tester, 'task-1');
     await goTo(tester, first, inProgress(tester));
     await first.up();
+    // The cards left behind slide up into place.
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     final second = await tester.startGesture(cardBody(tester, 'task-2'));
     await tester.pump(held);
     expect(find.text(app.i18n.t('mobile:board.moveTo')), findsNothing);
@@ -342,4 +345,126 @@ void main() {
       expect(find.byType(Tooltip), findsWidgets);
     });
   }
+
+  // On the web the card stays under the finger just where it was taken hold of, the column makes
+  // room for it as it goes, and it settles into its place when let go. It used to jump.
+  group('like the web board', () {
+    Finder lifted() =>
+        find.descendant(of: find.byType(LiftedCard), matching: find.byType(BoardCard));
+
+    onIOS('the card stays where it was taken hold of, and follows the finger', (
+      tester,
+      size,
+    ) async {
+      final server = FakeKaneo();
+      await pumpBoard(tester, server, size);
+      final before = tester.getRect(card('task-1'));
+      final grab = before.topLeft + const Offset(40, 30);
+      final gesture = await tester.startGesture(grab);
+      await tester.pump(held);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect((tester.getCenter(lifted()) - before.center).distance, lessThan(1));
+      await gesture.moveBy(const Offset(30, 50));
+      await tester.pump();
+      expect(
+        (tester.getCenter(lifted()) - (before.center + const Offset(30, 50))).distance,
+        lessThan(1),
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    onIOS('the column makes room where the card would land, and it lands there', (
+      tester,
+      size,
+    ) async {
+      final server = FakeKaneo()..relations.clear();
+      await pumpBoard(tester, server, size);
+      final other = tester.getRect(card('task-3'));
+      final gesture = await tester.startGesture(cardBody(tester, 'task-1'));
+      await tester.pump(held);
+      // Over the upper half of the card already in that column, clear of the screen's edge.
+      await goTo(tester, gesture, Offset(other.left + 20, other.top + 10));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      final placeholder = find.byKey(const ValueKey('board-card-preview-task-1'));
+      expect(find.descendant(of: column('in-progress'), matching: placeholder), findsOneWidget);
+      expect(tester.getRect(placeholder).top, lessThan(tester.getRect(card('task-3')).top));
+      expect(tester.getRect(card('task-3')).top, greaterThan(other.top));
+      expect(server.requestsTo('api/task/reorder'), isEmpty);
+      await gesture.up();
+      // Measured once the board has laid the card out in its new place.
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(CardLanding), findsOneWidget, reason: 'It does not settle into place');
+      await tester.pumpAndSettle();
+      expect(find.byType(CardLanding), findsNothing);
+      expect(statusOf(server, 'task-1'), 'in-progress');
+      expect(tester.getRect(card('task-1')).top, lessThan(tester.getRect(card('task-3')).top));
+      expect(server.tasks.firstWhere((t) => t['id'] == 'task-1')['position'], 0);
+    });
+
+    testBothLayouts('a click that wobbles a little opens the card, as on the web', (
+      tester,
+      size,
+    ) async {
+      final server = FakeKaneo();
+      await pumpBoard(tester, server, size);
+      final gesture = await tester.startGesture(
+        cardBody(tester, 'task-1'),
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.moveBy(const Offset(5, 3));
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(taskOpen('task-1'), findsOneWidget);
+      expect(server.requestsTo('api/task/reorder'), isEmpty);
+    });
+
+    onIOS('a card picked up at the edge leaves the board still until it moves', (
+      tester,
+      size,
+    ) async {
+      final server = FakeKaneo();
+      await pumpBoard(tester, server, size);
+      final scroll = tester
+          .widget<SingleChildScrollView>(find.byKey(const ValueKey('board-horizontal')))
+          .controller!;
+      // A card in the column that runs off the right of the screen, pressed close to the edge.
+      final edge = tester.getRect(find.byKey(const ValueKey('board-horizontal'))).right;
+      final rect = tester.getRect(card(size == wideSize ? 'task-6' : 'task-3'));
+      expect(rect.right, greaterThan(edge - 20));
+      final gesture = await tester.startGesture(Offset(edge - 12, rect.center.dy));
+      await tester.pump(held);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(scroll.offset, 0);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(server.requestsTo('api/task/reorder'), isEmpty);
+    });
+
+    // The card's drag ends through the card it started from. A long column scrolled it away and
+    // the drag never ended.
+    onIOS('a card carried down a long column and out of it still lands', (tester, size) async {
+      final server = FakeKaneo()..relations.clear();
+      for (var i = 0; i < 30; i++) {
+        server.addTask(title: 'Filler $i');
+      }
+      await pumpBoard(tester, server, size);
+      final lane = tester.getRect(find.byKey(const ValueKey('drop-column-to-do')));
+      final gesture = await tester.startGesture(cardBody(tester, 'task-1'));
+      await tester.pump(held);
+      await goTo(tester, gesture, Offset(lane.center.dx, lane.bottom - 30));
+      await goTo(tester, gesture, Offset(lane.center.dx, lane.bottom - 4));
+      for (var i = 0; i < 120; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(card('task-1'), findsNothing, reason: 'The column did not scroll it away');
+      await goTo(tester, gesture, inProgress(tester));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(statusOf(server, 'task-1'), 'in-progress');
+    });
+  });
 }
