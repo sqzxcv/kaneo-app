@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kaneo_app/features/markdown/legacy_html.dart';
 import 'package:kaneo_app/features/markdown/markdown_syntax.dart';
+import 'package:kaneo_app/features/markdown/markdown_urls.dart';
 import 'package:markdown/markdown.dart' as md;
 
 /// Parses [source] the way `MarkdownBody` does, and prints the result.
@@ -96,17 +97,40 @@ void main() {
   });
 
   group('issue links', () {
-    test('show the issue key', () {
+    test('show the issue key, and go to the task in the app', () {
       expect(
         parse('<kaneo-issue-link url="https://k/task/t1" issue-key="KAN-1" task-id="t1" />'),
-        '<p><a href="https://k/task/t1">KAN-1</a></p>',
+        '<p><a href="${taskLinkTo('t1')}">KAN-1</a></p>',
+      );
+      expect(
+        parse(
+          '<kaneo-issue-link data-url="https://k/x" data-issue-key="KAN-1" data-task-id="t1" />',
+        ),
+        '<p><a href="${taskLinkTo('t1')}">KAN-1</a></p>',
       );
     });
 
     test('show the address without a key', () {
       expect(
         parse('<kaneo-issue-link url="https://k/task/t1" issue-key="" task-id="t1" />'),
-        '<p><a href="https://k/task/t1">https://k/task/t1</a></p>',
+        '<p><a href="${taskLinkTo('t1')}">https://k/task/t1</a></p>',
+      );
+    });
+
+    test('without a task id go to the task their address is the page of', () {
+      expect(
+        parse(
+          '<kaneo-issue-link url="https://k/dashboard/workspace/w1/project/p1/task/t1" '
+          'issue-key="KAN-1" />',
+        ),
+        '<p><a href="${taskLinkTo('t1')}">KAN-1</a></p>',
+      );
+    });
+
+    test('go to their address when it is no task page', () {
+      expect(
+        parse('<kaneo-issue-link url="https://k/task/t1" issue-key="KAN-1" />'),
+        '<p><a href="https://k/task/t1">KAN-1</a></p>',
       );
     });
 

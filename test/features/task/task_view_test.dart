@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kaneo_app/core/core.dart';
 import 'package:kaneo_app/features/board/board_page.dart';
@@ -46,6 +47,33 @@ void _expectTwoColumns(WidgetTester tester) {
   expect(properties.top, lessThan(title.bottom));
   expect(description.top, greaterThanOrEqualTo(title.bottom));
   expect(description.right, lessThan(properties.left));
+}
+
+/// Lists the links handed to the system, which opens none of them.
+List<String> _recordLinks(WidgetTester tester) {
+  final opened = <String>[];
+  const channel = MethodChannel('plugins.flutter.io/url_launcher');
+  final messenger = tester.binding.defaultBinaryMessenger;
+  messenger.setMockMethodCallHandler(channel, (call) async {
+    opened.add((call.arguments as Map)['url'] as String);
+    return true;
+  });
+  addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  return opened;
+}
+
+/// Opens, from the board, a task whose description is only [link], and taps the link.
+Future<TestApp> _openLinkFrom(WidgetTester tester, Size size, String link) async {
+  final server = FakeKaneo()..addTask(id: 'link-holder', title: 'Has a link', description: link);
+  final app = await _openBoard(tester, size, server: server);
+  await _openCard(tester, 'link-holder');
+  final text = find.descendant(
+    of: find.descendant(of: taskOpen('link-holder'), matching: find.byType(TaskDescription)),
+    matching: find.byType(SelectableText),
+  );
+  await tester.tapAt(tester.getTopLeft(text) + const Offset(8, 8));
+  await tester.pumpAndSettle();
+  return app;
 }
 
 void _expectOneColumn(WidgetTester tester) {
@@ -295,6 +323,58 @@ void main() {
       await tester.pumpAndSettle();
       expect(taskOpen('task-3'), findsOneWidget);
       expect(tester.widget<TextField>(_title).controller!.text, 'Review the board layout');
+    });
+
+    // KAN-65: the web's task link went to the system browser instead.
+    testBothLayouts('a task link in a description opens that task in the app, as a full page', (
+      tester,
+      size,
+    ) async {
+      final opened = _recordLinks(tester);
+      // The address in it is the web's, on a host of its own, as on a server whose API is apart.
+      final app = await _openLinkFrom(
+        tester,
+        size,
+        '<kaneo-issue-link url="http://web.test:5173/dashboard/workspace/w/project/p/task/task-3" '
+        'issue-key="DEMO-3" task-id="task-3" />',
+      );
+      final router = app.container.read(routerProvider);
+      expect(opened, isEmpty);
+      expect(find.byType(TaskPage), findsOneWidget);
+      expect(router.state.uri.path, AppRoutes.task('task-3'));
+      expect(tester.widget<TextField>(_title).controller!.text, 'Review the board layout');
+      size == wideSize ? _expectTwoColumns(tester) : _expectOneColumn(tester);
+
+      // Back is the task the link was in.
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(taskOpen('task-3'), findsNothing);
+      expect(taskOpen('link-holder'), findsOneWidget);
+    });
+
+    testBothLayouts('the address of a task on this server opens that task in the app', (
+      tester,
+      size,
+    ) async {
+      final opened = _recordLinks(tester);
+      final app = await _openLinkFrom(
+        tester,
+        size,
+        '[the review](${FakeKaneo.serverUrl}/dashboard/workspace/${FakeKaneo.workspaceId}'
+        '/project/${FakeKaneo.projectId}/task/task-3)',
+      );
+      expect(opened, isEmpty);
+      expect(app.container.read(routerProvider).state.uri.path, AppRoutes.task('task-3'));
+      expect(find.byType(TaskPage), findsOneWidget);
+    });
+
+    testBothLayouts('any other link still goes to the system', (tester, size) async {
+      final opened = _recordLinks(tester);
+      const elsewhere = 'https://other.test/dashboard/workspace/w/project/p/task/task-3';
+      final app = await _openLinkFrom(tester, size, '[elsewhere]($elsewhere)');
+      expect(opened, [elsewhere]);
+      expect(app.container.read(routerProvider).state.uri.path, isNot(AppRoutes.task('task-3')));
+      expect(taskOpen('task-3'), findsNothing);
     });
   });
 

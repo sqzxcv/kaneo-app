@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -437,14 +438,20 @@ void main() {
       expect(_text(tester), app.i18n.t('mobile:editor.attachment'));
     });
 
+    // Tapping one opens the task in the app: see task_view_test.dart.
     testBothLayouts('kaneo-issue-link shows as a link with the issue key', (tester, size) async {
-      final opened = _mockLinks(tester);
       await _pump(tester, _issueLink, size);
       expectNoMarkup(tester);
       expect(_text(tester), 'KAN-1');
+      expect(_span(tester, 'KAN-1').recognizer, isA<TapGestureRecognizer>());
+    });
+
+    testBothLayouts('kaneo-issue-link to no task of ours opens its address', (tester, size) async {
+      final opened = _mockLinks(tester);
+      await _pump(tester, '<kaneo-issue-link url="https://k.test/x" issue-key="KAN-1" />', size);
       await tester.tap(find.byType(SelectableText));
       await tester.pump();
-      expect(opened, ['https://k.test/task/t1']);
+      expect(opened, ['https://k.test/x']);
     });
 
     testBothLayouts('kaneo-embed shows as a link', (tester, size) async {

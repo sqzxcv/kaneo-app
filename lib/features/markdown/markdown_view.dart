@@ -7,6 +7,7 @@ import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/core.dart';
+import '../task/open_task.dart';
 import 'legacy_html.dart';
 import 'markdown_syntax.dart';
 import 'markdown_urls.dart';
@@ -66,8 +67,15 @@ class MarkdownView extends ConsumerWidget {
   }
 }
 
+/// Opens a link to a task of this server in the app, and anything else in the system.
 Future<void> _openLink(BuildContext context, WidgetRef ref, String? href) async {
-  final target = resolveLink(ref.read(sessionProvider)?.serverUrl, href);
+  final serverUrl = ref.read(sessionProvider)?.serverUrl;
+  final taskId = linkedTaskId(serverUrl, href);
+  if (taskId != null) {
+    openTaskPage(context, taskId);
+    return;
+  }
+  final target = resolveLink(serverUrl, href);
   var opened = false;
   if (target != null) {
     try {

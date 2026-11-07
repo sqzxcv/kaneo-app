@@ -7,6 +7,7 @@ library;
 import 'package:markdown/markdown.dart' as md;
 
 import 'legacy_html.dart';
+import 'markdown_urls.dart';
 
 /// Elements `MarkdownView` builds itself.
 abstract final class KaneoTags {
@@ -170,11 +171,14 @@ class _KaneoTagSyntax extends md.InlineSyntax {
     return _link(label, _first(attrs, ['url', 'data-url']));
   }
 
+  /// A link to a task, which the app opens itself, as the web opens it in place. The web finds the
+  /// task by its id, or else by the address of its page.
   md.Node? _issueLink(Map<String, String> attrs) {
     final url = _first(attrs, ['url', 'data-url']);
     final key = _first(attrs, ['issue-key', 'data-issue-key', 'issuekey']);
+    final taskId = _first(attrs, ['task-id', 'data-task-id', 'taskid']) ?? taskIdInAddress(url);
     final label = key ?? url;
-    return label == null ? null : _link(label, url);
+    return label == null ? null : _link(label, taskId == null ? url : taskLinkTo(taskId));
   }
 
   md.Node? _embed(Map<String, String> attrs) {

@@ -76,4 +76,61 @@ void main() {
       expect(check('data:image/png;base64,AAAA'), isFalse);
     });
   });
+
+  group('linkedTaskId', () {
+    const page = '/dashboard/workspace/w1/project/p1/task/t1';
+
+    test('reads a task link from the editor, wherever its page is', () {
+      expect(linkedTaskId(server, taskLinkTo('t1')), 't1');
+      expect(linkedTaskId(null, taskLinkTo('t1')), 't1');
+      expect(linkedTaskId(server, taskLinkTo('a b/c')), 'a b/c');
+    });
+
+    test('reads the page of a task on the signed-in server', () {
+      expect(linkedTaskId(server, '$server$page'), 't1');
+      expect(linkedTaskId(server, '$server$page/'), 't1');
+      expect(linkedTaskId(server, '$server$page?tab=activity#c1'), 't1');
+      expect(linkedTaskId(server, 'https://KANEO.example.com:443$page'), 't1');
+      expect(linkedTaskId(server, page), 't1');
+      expect(linkedTaskId('http://localhost:1337', 'http://localhost:1337$page'), 't1');
+    });
+
+    test('reads the page under the path the server is reached at', () {
+      expect(linkedTaskId('$server/kaneo', '$server/kaneo$page'), 't1');
+      expect(linkedTaskId('$server/kaneo', '$server$page'), isNull);
+    });
+
+    test('leaves the page of a task on another server to the system', () {
+      expect(linkedTaskId(server, 'https://other.test$page'), isNull);
+      expect(linkedTaskId(server, 'http://kaneo.example.com$page'), isNull);
+      expect(linkedTaskId(server, 'https://kaneo.example.com:5173$page'), isNull);
+      expect(linkedTaskId(null, page), isNull);
+    });
+
+    test('leaves every other address to the system', () {
+      for (final href in [
+        null,
+        '',
+        '$server/dashboard/workspace/w1/project/p1',
+        '$server/dashboard/workspace/w1/project/p1/task',
+        '$server$page/subtasks',
+        '$server/api/task/t1',
+        '$server/EBB/task/EBB-1',
+        'https://a.test/b',
+        'mailto:a@b.test',
+        'kaneo-task:',
+        'kaneo-task:%E0',
+      ]) {
+        expect(linkedTaskId(server, href), isNull, reason: href);
+      }
+    });
+  });
+
+  test('taskIdInAddress reads the page of a task on any host', () {
+    expect(taskIdInAddress('http://localhost:5173/dashboard/workspace/w/project/p/task/x1'), 'x1');
+    expect(taskIdInAddress('https://a.test/dashboard/workspace/w/project/p/task/x1/'), 'x1');
+    expect(taskIdInAddress('https://a.test/task/x1'), isNull);
+    expect(taskIdInAddress(null), isNull);
+    expect(taskIdInAddress('http://[bad'), isNull);
+  });
 }
