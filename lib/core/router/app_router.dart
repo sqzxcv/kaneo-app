@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../platform/desktop/desktop_provider.dart';
 import '../../features/activity/activity_page.dart';
 import '../../features/auth/login_page.dart';
 import '../../features/board/board_page.dart';
@@ -87,6 +88,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+  ref.watch(desktopRuntimeProvider(router));
   ref.onDispose(router.dispose);
   return router;
 });

@@ -47,6 +47,11 @@
 		},
 		"language": {
 			"system": "跟随系统"
+		},
+		"desktop": {
+			"openNotification": "打开通知",
+			"newActivity": "Kaneo 有新动态",
+			"unavailable": "桌面通知暂不可用，请检查系统通知设置。"
 		}
 	},
 	"mobile": {

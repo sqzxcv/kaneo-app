@@ -50,6 +50,11 @@
 		},
 		"language": {
 			"system": "Match system"
+		},
+		"desktop": {
+			"openNotification": "Open notification",
+			"newActivity": "New activity in Kaneo",
+			"unavailable": "Desktop notifications are unavailable. Check your system notification settings."
 		}
 	}
 }

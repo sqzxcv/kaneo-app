@@ -34,3 +34,8 @@ export 'ui/pickers.dart';
 export 'ui/placeholder_page.dart';
 export 'ui/popover.dart';
 export 'ui/toast.dart';
+
+export 'notifications/settings.dart';
+export '../platform/desktop/desktop_host.dart';
+export '../platform/desktop/desktop_provider.dart';
+export '../platform/desktop/desktop_runtime.dart';
