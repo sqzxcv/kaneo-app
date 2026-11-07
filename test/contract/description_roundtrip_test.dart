@@ -89,7 +89,7 @@ void main() {
       name: 'C-description-$stamp',
       workspaceId: _workspaceId,
       icon: 'Layout',
-      slug: 'C$stamp',
+      slug: 'CD$stamp',
     );
     addTearDown(() => api.deleteProject(project.id));
     final columns = await api.columns(project.id);

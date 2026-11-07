@@ -57,7 +57,7 @@ void main() {
       name: 'C-relations-$stamp',
       workspaceId: _workspaceId,
       icon: 'Layout',
-      slug: 'C$stamp',
+      slug: 'CR$stamp',
     );
     addTearDown(() => api.deleteProject(project.id));
     final columns = await api.columns(project.id);

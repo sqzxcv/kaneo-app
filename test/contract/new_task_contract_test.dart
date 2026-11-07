@@ -56,7 +56,7 @@ void main() {
       name: 'C-new-task-$stamp',
       workspaceId: _workspaceId,
       icon: 'Layout',
-      slug: 'C$stamp',
+      slug: 'CN$stamp',
     );
     addTearDown(() => api.deleteProject(project.id));
 

@@ -67,6 +67,28 @@ void main() {
     });
   });
 
+  // KAN-60: comments stayed behind, and then every read of the workspace's activity failed.
+  test('deleting a project takes what hangs off its tasks, as on the real server', () async {
+    server.addComment('task-1', 'Goes with the project');
+    server.addTask(id: 'elsewhere', title: 'Elsewhere', projectId: FakeKaneo.secondProjectId);
+    server.addComment('elsewhere', 'Stays');
+    server.addRelation('task-1', 'elsewhere');
+    server.timeEntries.add({'id': 'entry', 'taskId': 'task-1'});
+    server.externalLinks.add({'id': 'link', 'taskId': 'task-1'});
+
+    await api.deleteProject(FakeKaneo.projectId);
+
+    expect(server.tasks.where((t) => t['projectId'] == FakeKaneo.projectId), isEmpty);
+    expect(server.relations.where((r) => r['targetTaskId'] == 'elsewhere'), isEmpty);
+    expect(server.timeEntries, isEmpty);
+    expect(server.externalLinks, isEmpty);
+    final activity = await api.workspaceActivity(FakeKaneo.workspaceId);
+    expect(activity.map((a) => a.excerpt), contains('Stays'));
+    expect(activity.map((a) => a.excerpt), isNot(contains('Goes with the project')));
+    final found = await api.search('Goes with the project', FakeKaneo.workspaceId);
+    expect(found.results, isEmpty);
+  });
+
   group('a second workspace', () {
     const other = 'other-workspace';
 

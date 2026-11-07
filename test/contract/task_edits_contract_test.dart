@@ -56,7 +56,7 @@ void main() {
       name: 'C-task-edits-$stamp',
       workspaceId: _workspaceId,
       icon: 'Layout',
-      slug: 'C$stamp',
+      slug: 'CE$stamp',
     );
     addTearDown(() => api.deleteProject(project.id));
     final columns = await api.columns(project.id);

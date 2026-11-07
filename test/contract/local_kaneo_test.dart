@@ -110,6 +110,42 @@ Future<void> _checkMoveCopyDelete(KaneoApi api, String workspaceId) async {
   expect(await api.relations(copy.id), isEmpty);
 }
 
+/// A project takes the record of its tasks with it. FakeKaneo once kept that, and from then on could
+/// answer neither the workspace's activity nor a search.
+Future<void> _checkDeletedProject(KaneoApi api, String workspaceId) async {
+  final stamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase();
+  final project = await api.createProject(
+    name: 'A-Deleted project $stamp',
+    workspaceId: workspaceId,
+    icon: 'Layout',
+    slug: 'AD$stamp',
+  );
+  var deleted = false;
+  addTearDown(() async {
+    if (!deleted) await api.deleteProject(project.id);
+  });
+  final task = await api.createTask(
+    project.id,
+    CreateTaskBody(title: 'A-Task $stamp', description: '', priority: 'low', status: 'to-do'),
+  );
+  final words = 'A-Comment $stamp';
+  await api.createComment(task.id, words);
+  Future<List<String>> found() async => [
+    for (final result in (await api.search(words, workspaceId)).results) result.type,
+  ];
+  Future<List<String?>> inActivity() async => [
+    for (final activity in await api.workspaceActivity(workspaceId)) activity.taskId,
+  ];
+  expect(await found(), contains('comment'));
+  expect(await inActivity(), contains(task.id));
+
+  await api.deleteProject(project.id);
+  deleted = true;
+
+  expect(await found(), isEmpty);
+  expect(await inActivity(), isNot(contains(task.id)));
+}
+
 void main() {
   late I18n i18n;
   late ApiClient real;
@@ -215,7 +251,7 @@ void main() {
         name: 'Contract test $stamp',
         workspaceId: _workspaceId,
         icon: 'Layout',
-        slug: 'C$stamp',
+        slug: 'CW$stamp',
       );
       addTearDown(() => api.deleteProject(project.id));
       final me = await api.me();
@@ -338,6 +374,11 @@ void main() {
         await _checkMoveCopyDelete(KaneoApi(fake, i18n), FakeKaneo.workspaceId);
       },
     );
+
+    test('deleting a project takes its activity with it, on the server and on FakeKaneo', () async {
+      await _checkDeletedProject(api, _workspaceId);
+      await _checkDeletedProject(KaneoApi(fake, i18n), FakeKaneo.workspaceId);
+    });
 
     test('the API key from dev.env works, in the x-api-key header', () async {
       final byKey = KaneoApi(client(_serverUrl, _apiKey, null), i18n);

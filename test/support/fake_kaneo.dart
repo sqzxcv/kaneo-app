@@ -732,6 +732,18 @@ class FakeKaneo implements HttpClientAdapter {
           .firstOrNull ??
       (throw const _NotFound('Comment not found or you are not the author'));
 
+  /// Like the server, this takes everything that hangs off the task with it, however the task goes.
+  void _removeTask(Map<String, dynamic> task) {
+    final id = task['id'];
+    tasks.remove(task);
+    relations.removeWhere((r) => r['sourceTaskId'] == id || r['targetTaskId'] == id);
+    labels.removeWhere((l) => l['taskId'] == id);
+    activities.removeWhere((a) => a['taskId'] == id);
+    timeEntries.removeWhere((e) => e['taskId'] == id);
+    externalLinks.removeWhere((l) => l['taskId'] == id);
+    customFieldValues.removeWhere((v) => v['taskId'] == id);
+  }
+
   Map<String, dynamic> _member(String? id) =>
       members.firstWhere((m) => m['id'] == id, orElse: () => const {'name': null, 'image': null});
 
@@ -1358,7 +1370,7 @@ class FakeKaneo implements HttpClientAdapter {
     _route('DELETE', 'api/project/:id', (request, params) {
       final project = _find(projects, params[0], 'Project');
       projects.remove(project);
-      tasks.removeWhere((t) => t['projectId'] == project['id']);
+      tasks.where((t) => t['projectId'] == project['id']).toList().forEach(_removeTask);
       columns.removeWhere((c) => c['projectId'] == project['id']);
       return project;
     });
@@ -1580,14 +1592,7 @@ class FakeKaneo implements HttpClientAdapter {
     });
     _route('DELETE', 'api/task/:id', (request, params) {
       final task = _find(tasks, params[0], 'Task');
-      final id = task['id'];
-      tasks.remove(task);
-      // Like the server, this takes everything that hangs off the task with it.
-      relations.removeWhere((r) => r['sourceTaskId'] == id || r['targetTaskId'] == id);
-      labels.removeWhere((l) => l['taskId'] == id);
-      activities.removeWhere((a) => a['taskId'] == id);
-      externalLinks.removeWhere((l) => l['taskId'] == id);
-      customFieldValues.removeWhere((v) => v['taskId'] == id);
+      _removeTask(task);
       return task;
     });
 
