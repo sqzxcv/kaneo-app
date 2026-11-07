@@ -37,6 +37,9 @@ def require(path):
 
 
 def validate_bundle(source, platform):
+    for path in source.rglob('*'):
+        if path.is_symlink() and not path.resolve().is_relative_to(source.resolve()):
+            raise ValueError(f'Bundle symlink points outside the application: {path.name}')
     if platform == 'macos':
         info = plistlib.loads(require(source / 'Contents/Info.plist').read_bytes())
         if info.get('CFBundleIdentifier') != BUNDLE_ID:
@@ -48,7 +51,7 @@ def validate_bundle(source, platform):
     require(source / 'data/icudtl.dat')
     require(source / 'data/flutter_assets/AssetManifest.bin')
     if platform == 'windows':
-        for name in ['kaneo_app.exe', 'flutter_windows.dll', 'vcruntime140.dll', 'msvcp140.dll']:
+        for name in ['kaneo_app.exe', 'flutter_windows.dll', 'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll']:
             require(source / name)
         require(source / 'data/app.so')
     elif platform == 'linux':

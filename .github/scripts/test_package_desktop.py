@@ -26,6 +26,15 @@ class PackageValidationTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'formal bundle ID'):
                 package.validate_bundle(root, 'macos')
 
+    def test_bundle_cannot_depend_on_an_external_symlink(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'bundle'
+            root.mkdir()
+            (Path(temp) / 'outside.dll').write_bytes(b'not bundled')
+            (root / 'runtime.dll').symlink_to('../outside.dll')
+            with self.assertRaisesRegex(ValueError, 'outside the application'):
+                package.validate_bundle(root, 'windows')
+
     def test_macos_bundle_requires_flutter_frameworks(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -42,7 +51,7 @@ class PackageValidationTest(unittest.TestCase):
             root = Path(temp)
             (root / 'data/flutter_assets').mkdir(parents=True)
             for name in ['data/icudtl.dat', 'data/flutter_assets/AssetManifest.bin', 'kaneo_app.exe',
-                         'flutter_windows.dll', 'vcruntime140.dll', 'msvcp140.dll']:
+                         'flutter_windows.dll', 'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll']:
                 (root / name).touch()
             with self.assertRaisesRegex(ValueError, 'app.so'):
                 package.validate_bundle(root, 'windows')
