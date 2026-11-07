@@ -560,7 +560,11 @@ void main() {
       expect(await until(tester, () => resized, seconds: 10), isTrue);
       await resizing;
       debugPrint('B_CHECK narrow-window resized');
-      await tester.pumpAndSettle(timeout: const Duration(seconds: 10));
+      await tester.pumpAndSettle(
+        const Duration(milliseconds: 100),
+        EnginePhase.sendSemanticsUpdate,
+        const Duration(seconds: 10),
+      );
       expect(find.byKey(const ValueKey('board-horizontal')), findsOneWidget);
       expect(find.byKey(ValueKey('column-header-${columns[1].slug}')), findsOneWidget);
       await shot(tester, '13-narrow-window');
