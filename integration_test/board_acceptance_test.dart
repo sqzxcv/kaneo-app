@@ -18,6 +18,7 @@ import 'package:kaneo_app/features/board/board_expansion.dart';
 import 'package:kaneo_app/features/shell/app_shell.dart' show shellPageKey;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../test/support/test_app.dart' show taskOpen;
 
@@ -128,6 +129,10 @@ void main() {
     // keyboard behavior remains a separate manual acceptance item.
     tester.testTextInput.register();
     addTearDown(tester.testTextInput.unregister);
+    if (Platform.isMacOS) {
+      await windowManager.ensureInitialized();
+      await windowManager.setSize(const Size(1366, 1024));
+    }
     final config = DevConfig.fromEnvironment();
     final host = Uri.parse(config.serverUrl).host;
     expect(['localhost', '127.0.0.1', '::1'], contains(host), reason: 'Local Kaneo only.');
@@ -362,7 +367,8 @@ void main() {
       );
     }
     await tester.pumpAndSettle();
-    expect(tester.getTopLeft(header), top);
+    // ensureVisible may also reveal the column horizontally; its header stays fixed vertically.
+    expect(tester.getTopLeft(header).dy, top.dy);
     expect(find.byType(BoardCard).evaluate().length, lessThan(60));
     debugPrint('B_METRIC 100-card-scroll ${timer.elapsedMilliseconds}ms');
     await shot(tester, '04-hundred-cards');
