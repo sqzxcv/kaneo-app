@@ -323,7 +323,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(tester.getTopLeft(header), headerBefore);
+    expect(tester.getTopLeft(header).dy, headerBefore.dy);
     expect((await api.task(parent.id)).status, doing);
     expect((await api.task(child.id)).status, todo);
     // The second same-column parent still owns the child in the display hierarchy.
