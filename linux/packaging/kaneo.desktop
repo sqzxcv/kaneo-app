@@ -3,6 +3,7 @@ Type=Application
 Name=Kaneo
 Comment=Projects, boards and tasks for your Kaneo server
 Exec=kaneo
+Icon=kaneo
 Terminal=false
 Categories=Office;ProjectManagement;
 StartupWMClass=app.kaneo.kaneo_app

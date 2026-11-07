@@ -97,6 +97,14 @@ def package_macos(source, output, version, build):
     return artifact
 
 
+def stage_linux_icons(stage):
+    """Installs the launcher icon at each size, where the desktop file's Icon=kaneo finds it."""
+    for icon in sorted((ROOT / 'linux/packaging/icons').glob('*.png')):
+        apps = stage / f'usr/share/icons/hicolor/{icon.stem}x{icon.stem}/apps'
+        apps.mkdir(parents=True)
+        shutil.copy2(icon, apps / 'kaneo.png')
+
+
 def package_linux(source, output, version, build):
     validate_bundle(source, 'linux')
     architecture = subprocess.check_output(['dpkg', '--print-architecture'], text=True).strip()
@@ -110,6 +118,7 @@ def package_linux(source, output, version, build):
         applications = stage / 'usr/share/applications'
         applications.mkdir(parents=True)
         shutil.copy2(ROOT / 'linux/packaging/kaneo.desktop', applications)
+        stage_linux_icons(stage)
         docs = stage / 'usr/share/doc/kaneo'
         docs.mkdir(parents=True)
         shutil.copy2(ROOT / 'linux/INSTALL.md', docs / 'README.md')

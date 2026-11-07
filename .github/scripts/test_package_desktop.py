@@ -46,6 +46,19 @@ class PackageValidationTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'FlutterMacOS.framework'):
                 package.validate_bundle(root, 'macos')
 
+    def test_linux_icons_are_where_the_desktop_file_looks(self):
+        self.assertIn('\nIcon=kaneo\n', (package.ROOT / 'linux/packaging/kaneo.desktop').read_text())
+        sizes = sorted(int(p.stem) for p in (package.ROOT / 'linux/packaging/icons').glob('*.png'))
+        self.assertIn(256, sizes)
+        with tempfile.TemporaryDirectory() as temp:
+            stage = Path(temp)
+            package.stage_linux_icons(stage)
+            installed = sorted(p.relative_to(stage).as_posix() for p in stage.rglob('*.png'))
+        self.assertEqual(
+            installed,
+            sorted(f'usr/share/icons/hicolor/{n}x{n}/apps/kaneo.png' for n in sizes),
+        )
+
     def test_windows_requires_assets_aot_and_runtime(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

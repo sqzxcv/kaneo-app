@@ -34,7 +34,8 @@ class NativeNotificationHost implements NotificationHost {
   Future<void> initialize(void Function(String? payload)? onTap) async {
     await _notifications.initialize(
       settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        // The status bar shows only an icon's shape, so it gets a white one of its own.
+        android: AndroidInitializationSettings('@drawable/ic_notification'),
         iOS: DarwinInitializationSettings(
           requestAlertPermission: false,
           requestBadgePermission: false,
