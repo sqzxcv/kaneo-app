@@ -652,7 +652,8 @@ void main() {
     final activity = find.byType(ActivityPage);
     final search = find.byType(SearchPage);
 
-    /// Every page, with what it shows of [shows] and nothing of anyone in [hidden].
+    /// Every page, with [project], [task], [notice] and [marker]'s comment on them, and nothing of
+    /// anyone in [hidden].
     Future<void> everyPage({
       required String name,
       required String marker,
