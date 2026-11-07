@@ -14,6 +14,10 @@ const _email = String.fromEnvironment('AUTH_TEST_EMAIL');
 const _password = String.fromEnvironment('AUTH_TEST_PASSWORD');
 const _apiKey = String.fromEnvironment('AUTH_TEST_API_KEY');
 const _phase = String.fromEnvironment('AUTH_TEST_PHASE', defaultValue: 'roundtrip');
+const _storageKey = String.fromEnvironment(
+  'AUTH_TEST_STORAGE_KEY',
+  defaultValue: 'kaneo.auth.integration.session',
+);
 
 Future<void> waitUntil(WidgetTester tester, bool Function() ready) async {
   final deadline = DateTime.now().add(const Duration(seconds: 30));
@@ -29,7 +33,7 @@ void main() {
   testWidgets('production login and keychain persistence', (tester) async {
     expect(_server.isNotEmpty, isTrue, reason: 'Pass private AUTH_TEST_* defines.');
     expect(DevConfig.fromEnvironment().isConfigured, isFalse);
-    final storage = SecureSessionStorage(key: 'kaneo.auth.integration.session');
+    final storage = SecureSessionStorage(key: _storageKey);
     // The separate "save" and "restore" invocations prove that the session survives process exit.
     if (_phase == 'restore' || (_phase == 'restart' && await storage.read() != null)) {
       final container = await bootstrap(sessionStorage: storage);
@@ -75,7 +79,7 @@ void main() {
           find.byKey(const ValueKey('login-error')).evaluate().isNotEmpty,
     );
     expect(container.read(sessionProvider) != null, isTrue, reason: 'Password sign-in failed');
-    final stored = await SecureSessionStorage(key: 'kaneo.auth.integration.session').read();
+    final stored = await SecureSessionStorage(key: _storageKey).read();
     expect(stored != null && stored.token == container.read(sessionProvider)?.token, isTrue);
     await container.read(sessionProvider.notifier).signOut();
     await tester.pumpAndSettle();
@@ -94,7 +98,7 @@ void main() {
     );
     expect(container.read(sessionProvider) != null, isTrue, reason: 'API key sign-in failed');
     expect(
-      (await SecureSessionStorage(key: 'kaneo.auth.integration.session').read())?.credentialType ==
+      (await SecureSessionStorage(key: _storageKey).read())?.credentialType ==
           CredentialType.apiKey,
       isTrue,
     );
