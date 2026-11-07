@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -797,11 +796,8 @@ void main() {
 }
 
 Future<TestGesture> _startDrag(WidgetTester tester, String id) async {
-  final gesture = await tester.startGesture(
-    tester.getCenter(find.byKey(ValueKey('drag-handle-$id'))),
-    kind: PointerDeviceKind.touch,
-  );
-  // Past the distance that makes it a drag.
+  final gesture = await pickUpCard(tester, id);
+  // Past the distance that lets a drop move it.
   await gesture.moveBy(const Offset(30, 30));
   await tester.pump();
   return gesture;

@@ -1,7 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:kaneo_app/core/core.dart';
@@ -63,6 +64,19 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
   Offset? _pointer;
   String? _dragging;
 
+  /// Where the pointer on a card went down, and whether it has since gone further than a touch
+  /// slop. A card let go of before that stays where it was.
+  Offset? _down;
+  bool _travelled = false;
+
+  /// Whether the pointer on a card was lifted, rather than cancelled.
+  bool _letGo = false;
+
+  /// The pointers that drag a card as soon as they move. A finger or pen scrolls the board then, so
+  /// it picks a card up with a long press instead.
+  static const _mice = {PointerDeviceKind.mouse, PointerDeviceKind.trackpad};
+  static final _fingers = PointerDeviceKind.values.toSet().difference(_mice);
+
   void _start(String id) {
     widget.onDragging?.call(true);
     setState(() => _dragging = id);
@@ -110,41 +124,73 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
     super.dispose();
   }
 
-  Widget _draggable(BoardTask task, double width, Widget child) => Listener(
-    onPointerDown: (event) => _pointer = event.position,
-    onPointerMove: (event) => _pointer = event.position,
-    child: Draggable<String>(
-      data: task.id,
-      maxSimultaneousDrags: widget.busy ? 0 : 1,
-      dragAnchorStrategy: pointerDragAnchorStrategy,
-      feedbackOffset: const Offset(12, 12),
-      feedback: Material(
-        color: Colors.transparent,
-        elevation: 8,
-        child: SizedBox(
-          width: width - 16,
-          child: BoardCard(task: task, projectSlug: widget.board.slug),
+  /// Picks [task] up from [child] with a pointer of [devices]: as soon as it moves, or once held
+  /// still for [delay].
+  Widget _draggable(
+    BoardTask task,
+    double width,
+    Widget child, {
+    required Set<PointerDeviceKind> devices,
+    Duration? delay,
+    VoidCallback? onEnd,
+  }) => _CardDraggable(
+    devices: devices,
+    delay: delay,
+    data: task.id,
+    maxSimultaneousDrags: widget.busy ? 0 : 1,
+    dragAnchorStrategy: pointerDragAnchorStrategy,
+    feedbackOffset: const Offset(12, 12),
+    feedback: Material(
+      color: Colors.transparent,
+      elevation: 8,
+      child: SizedBox(
+        width: width - 16,
+        child: BoardCard(task: task, projectSlug: widget.board.slug),
+      ),
+    ),
+    onDragStarted: () => _start(task.id),
+    onDragEnd: (_) {
+      _end();
+      onEnd?.call();
+    },
+    child: child,
+  );
+
+  /// Lets a mouse drag [card] at once, and a finger or pen after a long press, because moving at
+  /// once they scroll the board. A long press let go of where it started opens the card's menu,
+  /// as it does on a card that can't move.
+  Widget _liftable(BoardTask task, double width, Widget card) => Listener(
+    onPointerDown: (event) {
+      _pointer = _down = event.position;
+      _travelled = _letGo = false;
+    },
+    onPointerMove: (event) {
+      _pointer = event.position;
+      if ((event.position - (_down ?? event.position)).distance > kTouchSlop) _travelled = true;
+    },
+    onPointerUp: (_) => _letGo = true,
+    child: _draggable(
+      task,
+      width,
+      devices: _mice,
+      Builder(
+        builder: (anchor) => _draggable(
+          task,
+          width,
+          devices: _fingers,
+          delay: kLongPressTimeout,
+          onEnd: () {
+            final down = _down;
+            if (_letGo && !_travelled && down != null) widget.onMenu?.call(anchor, task, down);
+          },
+          card,
         ),
       ),
-      onDragStarted: () => _start(task.id),
-      onDragEnd: (_) => _end(),
-      child: child,
     ),
   );
 
   Widget _card(HierarchyRow row, BoardColumn column, double width) {
     final task = row.task;
-    final handle = !widget.canMove
-        ? null
-        : _draggable(
-            task,
-            width,
-            Padding(
-              key: ValueKey('drag-handle-${task.id}'),
-              padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
-              child: Icon(LucideIcons.gripVertical, size: 20, color: context.colors.chipIcon),
-            ),
-          );
     final card = Opacity(
       opacity: _dragging == task.id ? 0.35 : 1,
       child: BoardCard(
@@ -154,16 +200,12 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
         onToggle: () => ref.read(boardExpansionProvider(widget.board.id).notifier).toggle(task.id),
         projectSlug: widget.board.slug,
         isFinal: column.isFinal == true,
-        dragHandle: handle,
         onMenu: widget.onMenu,
+        // While a move saves, nothing picks a card up, so a long press opens the menu at once.
+        lifts: widget.canMove && !widget.busy,
       ),
     );
-    // Touch scrolling and the long-press menu remain available on the card body.
-    return !widget.canMove ||
-            defaultTargetPlatform == TargetPlatform.iOS ||
-            defaultTargetPlatform == TargetPlatform.android
-        ? card
-        : _draggable(task, width, card);
+    return widget.canMove ? _liftable(task, width, card) : card;
   }
 
   @override
@@ -225,7 +267,9 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
     return DragTarget<String>(
       key: ValueKey('drop-column-${column.slug}'),
       onWillAcceptWithDetails: (_) => !widget.busy,
-      onAcceptWithDetails: (details) => widget.onMove(details.data, column.slug, tasks.length),
+      onAcceptWithDetails: (details) {
+        if (_travelled) widget.onMove(details.data, column.slug, tasks.length);
+      },
       builder: (context, candidates, rejects) => DecoratedBox(
         decoration: BoxDecoration(
           color: context.colors.boardLane,
@@ -311,11 +355,14 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
                       : _CardTarget(
                           key: ValueKey('drop-card-${rows[index].task.id}'),
                           enabled: !widget.busy,
-                          onDrop: (id, after) => widget.onMove(
-                            id,
-                            column.slug,
-                            taskIndices[rows[index].task.id]! + (after ? 1 : 0),
-                          ),
+                          onDrop: (id, after) {
+                            if (!_travelled) return;
+                            widget.onMove(
+                              id,
+                              column.slug,
+                              taskIndices[rows[index].task.id]! + (after ? 1 : 0),
+                            );
+                          },
                           child: Padding(
                             padding: EdgeInsets.only(
                               bottom: 8,
@@ -379,4 +426,38 @@ class _CardTargetState extends State<_CardTarget> {
       child: widget.child,
     ),
   );
+}
+
+/// A card's [Draggable] that only pointers of [devices] pick up: as soon as they move, or once held
+/// still for [delay], with the click [LongPressDraggable] gives.
+class _CardDraggable extends Draggable<String> {
+  const _CardDraggable({
+    required this.devices,
+    this.delay,
+    required super.data,
+    required super.feedback,
+    required super.child,
+    super.maxSimultaneousDrags,
+    super.dragAnchorStrategy,
+    super.feedbackOffset,
+    super.onDragStarted,
+    super.onDragEnd,
+  });
+
+  final Set<PointerDeviceKind> devices;
+  final Duration? delay;
+
+  @override
+  MultiDragGestureRecognizer createRecognizer(GestureMultiDragStartCallback onStart) {
+    final delay = this.delay;
+    if (delay == null) {
+      return ImmediateMultiDragGestureRecognizer(supportedDevices: devices)..onStart = onStart;
+    }
+    return DelayedMultiDragGestureRecognizer(delay: delay, supportedDevices: devices)
+      ..onStart = (position) {
+        final drag = onStart(position);
+        if (drag != null) HapticFeedback.selectionClick();
+        return drag;
+      };
+  }
 }

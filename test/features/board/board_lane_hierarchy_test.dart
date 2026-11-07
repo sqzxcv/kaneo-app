@@ -1,12 +1,10 @@
-import 'dart:ui' show PointerDeviceKind;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kaneo_app/core/core.dart';
 import 'package:kaneo_app/features/board/board_expansion.dart';
 
 import '../../support/test_app.dart';
-import 'board_drag_test.dart' show startDrag, goTo;
+import 'board_drag_test.dart' show goTo;
 import 'board_filter_page_test.dart' show search;
 
 FakeKaneo tree() {
@@ -158,7 +156,7 @@ void main() {
     await open(tester, size, server);
     final relations = server.relations.map((r) => Map.of(r)).toList();
     final before = server.tasks.where((t) => t['id'] != 'parent').map((t) => Map.of(t)).toList();
-    final gesture = await startDrag(tester, 'parent', PointerDeviceKind.touch);
+    final gesture = await pickUpCard(tester, 'parent');
     await goTo(
       tester,
       gesture,
@@ -190,7 +188,7 @@ void main() {
     server.addTask(id: 'moving', title: 'B Moving');
     await open(tester, size, server);
     final target = tester.getRect(find.byKey(const ValueKey('drop-card-neighbor')));
-    final gesture = await startDrag(tester, 'moving', PointerDeviceKind.touch);
+    final gesture = await pickUpCard(tester, 'moving');
     await goTo(tester, gesture, target.topLeft + const Offset(80, 12));
     await gesture.up();
     await tester.pumpAndSettle();

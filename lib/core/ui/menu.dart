@@ -68,10 +68,14 @@ Future<T?> showActionMenu<T>(
 /// pointer, and if that cancel is lost, as integration tests lose it, [child] never long-presses
 /// again.
 class MenuGestures extends StatelessWidget {
-  const MenuGestures({super.key, required this.onMenu, required this.child});
+  const MenuGestures({super.key, required this.onMenu, required this.child, this.longPressDevices});
 
   final ValueChanged<Offset>? onMenu;
   final Widget child;
+
+  /// The kinds of pointer whose long press opens the menu, or null for all of them. Leave a kind
+  /// out when its long press does something else on [child], such as picking it up.
+  final Set<PointerDeviceKind>? longPressDevices;
 
   @override
   Widget build(BuildContext context) {
@@ -86,8 +90,9 @@ class MenuGestures extends StatelessWidget {
           ),
           _MenuLongPress: GestureRecognizerFactoryWithHandlers<_MenuLongPress>(
             () => _MenuLongPress(debugOwner: this),
-            (recognizer) =>
-                recognizer.onLongPressStart = (details) => onMenu(details.globalPosition),
+            (recognizer) => recognizer
+              ..devices = longPressDevices
+              ..onLongPressStart = (details) => onMenu(details.globalPosition),
           ),
         },
       },
@@ -113,6 +118,14 @@ class _MenuSemantics extends SemanticsGestureDelegate {
 /// A long press that ends itself as soon as it has started, the way the menu's route would end it.
 class _MenuLongPress extends LongPressGestureRecognizer {
   _MenuLongPress({super.debugOwner});
+
+  /// The kinds of pointer it answers, or null for all. Unlike [supportedDevices] it can change
+  /// while the recognizer lives on.
+  Set<PointerDeviceKind>? devices;
+
+  @override
+  bool isPointerAllowed(PointerDownEvent event) =>
+      (devices?.contains(event.kind) ?? true) && super.isPointerAllowed(event);
 
   @override
   void didExceedDeadline() {

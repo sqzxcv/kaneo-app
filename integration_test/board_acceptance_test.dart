@@ -107,12 +107,19 @@ Future<void> menu(WidgetTester tester, String title) async {
 }
 
 Future<TestGesture> dragStart(WidgetTester tester, String id, {bool mouse = false}) async {
-  final handle = find.byKey(ValueKey('drag-handle-$id'));
-  if (handle.hitTestable().evaluate().isEmpty) await tester.ensureVisible(handle);
+  final card = find.byKey(ValueKey('board-card-$id'));
+  if (card.hitTestable().evaluate().isEmpty) await tester.ensureVisible(card);
   final gesture = await tester.startGesture(
-    tester.getCenter(handle),
+    tester.getCenter(card),
     kind: mouse ? ui.PointerDeviceKind.mouse : ui.PointerDeviceKind.touch,
   );
+  if (!mouse) {
+    // A finger picks a card up with a long press, timed by the clock on a device.
+    final end = DateTime.now().add(const Duration(milliseconds: 700));
+    while (DateTime.now().isBefore(end)) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+  }
   await gesture.moveBy(const Offset(8, 8));
   await tester.pump();
   return gesture;

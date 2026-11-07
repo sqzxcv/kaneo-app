@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -12,10 +13,10 @@ class BoardCard extends StatelessWidget {
     required this.task,
     required this.projectSlug,
     this.isFinal = false,
-    this.dragHandle,
     this.onMenu,
     this.hierarchy,
     this.onToggle,
+    this.lifts = false,
   });
 
   final BoardTask task;
@@ -23,8 +24,11 @@ class BoardCard extends StatelessWidget {
   final VoidCallback? onToggle;
   final String projectSlug;
   final bool isFinal;
-  final Widget? dragHandle;
   final void Function(BuildContext context, BoardTask task, Offset position)? onMenu;
+
+  /// Whether a long press picks the card up rather than opening the menu. Whoever picks it up opens
+  /// the menu when a finger or pen lets go where it started; a mouse has its right button.
+  final bool lifts;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +45,7 @@ class BoardCard extends StatelessWidget {
     final onMenu = this.onMenu;
     return MenuGestures(
       onMenu: onMenu == null ? null : (position) => onMenu(context, task, position),
+      longPressDevices: lifts ? const <PointerDeviceKind>{} : null,
       child: Material(
         color: isFinal ? colors.boardCardDone : colors.boardCard,
         shape: RoundedRectangleBorder(
@@ -57,7 +62,6 @@ class BoardCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    ?dragHandle,
                     if ((hierarchy?.childCount ?? 0) > 0)
                       SizedBox(
                         width: 32,

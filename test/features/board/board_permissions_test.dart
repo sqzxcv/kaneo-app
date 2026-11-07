@@ -7,6 +7,9 @@ import '../../support/test_app.dart';
 
 Finder card(String id) => find.byKey(ValueKey('board-card-$id'));
 
+/// Whatever picks a card up, of any kind of [Draggable].
+final draggable = find.byWidgetPredicate((w) => w is Draggable);
+
 /// Long-presses [id]'s card and returns what its menu offers.
 Future<List<String>> menuOf(WidgetTester tester, I18n i18n, String id) async {
   await tester.longPress(find.descendant(of: card(id), matching: find.text('Set up the project')));
@@ -72,7 +75,7 @@ void main() {
     expect(await menuOf(tester, app.i18n, 'task-1'), ['openTask']);
   });
 
-  // Desktops pick a card up by its body as well as by its grip.
+  // Every platform picks a card up by its body (KAN-69).
   for (final platform in [TargetPlatform.iOS, TargetPlatform.macOS]) {
     testBothLayouts('a viewer cannot pick a card up on ${platform.name}', (tester, size) async {
       debugDefaultTargetPlatformOverride = platform;
@@ -80,8 +83,7 @@ void main() {
         final server = viewer();
         await pumpBoard(tester, server, size);
         expect(card('task-1'), findsOneWidget);
-        expect(find.byKey(const ValueKey('drag-handle-task-1')), findsNothing);
-        expect(find.byType(Draggable<String>), findsNothing);
+        expect(draggable, findsNothing);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -106,7 +108,7 @@ void main() {
       'sendToBottomOfColumn',
       'openTask',
     ]);
-    expect(find.byKey(const ValueKey('drag-handle-task-1')), findsOneWidget);
+    expect(find.ancestor(of: card('task-1'), matching: draggable), findsWidgets);
     expect(find.byTooltip('New task'), findsNothing);
   });
 

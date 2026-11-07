@@ -509,33 +509,16 @@ class Bb {
   /// Opens [finder]'s menu the way this device does: a right click with a mouse, else a long press.
   Future<void> openMenu(Finder finder) async => isMacOS ? rightClick(finder) : longPress(finder);
 
-  /// The grip drawn beside a card's number, which is what picks the card up; null if none.
-  Offset? gripOf(String title) {
-    final at = rectOf(card(title));
-    final icons = find.byType(Icon).evaluate().where((e) {
-      final r = tester.getRect(find.byElementPredicate((x) => x == e));
-      return r.center.dy > at.top - 60 &&
-          r.center.dy < at.top &&
-          r.center.dx > at.left - 8 &&
-          r.center.dx < at.left + 36;
-    }).toList();
-    if (icons.isEmpty) return null;
-    return tester.getRect(find.byElementPredicate((x) => x == icons.first)).center;
-  }
+  /// Where to take hold of [title]'s card: its title. Cards have no grip since KAN-69.
+  Offset grip(String title) => rectOf(card(title)).center;
 
-  /// Where to pick [title]'s card up: its grip, else the card itself.
-  Offset grip(String title) => gripOf(title) ?? rectOf(card(title)).center;
-
-  /// How long to hold before moving: a moment on the grip, a long press elsewhere.
-  Duration holdFor(String title) =>
-      gripOf(title) != null ? const Duration(milliseconds: 120) : const Duration(milliseconds: 700);
-
-  /// Kept for the tests that start their own gestures.
-  Duration get pickUp => const Duration(milliseconds: 120);
+  /// How long to hold before moving: a finger picks a card up with a long press, and a mouse may
+  /// rest on it as long as it likes.
+  Duration get pickUp => const Duration(milliseconds: 700);
 
   /// Drags [title]'s card to [to], the way this device does.
   Future<void> dragCard(String title, Offset to, {int steps = 20}) =>
-      drag(grip(title), to, hold: holdFor(title), steps: steps);
+      drag(grip(title), to, hold: pickUp, steps: steps);
 
   /// Drags with a finger, or the mouse on macOS: press, hold, move in steps, release.
   Future<void> drag(

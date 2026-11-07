@@ -4,26 +4,52 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kaneo_app/core/core.dart';
+import 'package:kaneo_app/features/board/board_card.dart';
 
 import '../../support/test_app.dart';
 
 Finder card(String id) => find.byKey(ValueKey('board-card-$id'));
 Finder column(String slug) => find.byKey(ValueKey('drop-column-$slug'));
 
-Future<TestGesture> startDrag(WidgetTester tester, String id, PointerDeviceKind kind) async {
-  final gesture = await tester.startGesture(
-    tester.getCenter(find.byKey(ValueKey('drag-handle-$id'))),
-    kind: kind,
-  );
-  await gesture.moveBy(const Offset(4, 4));
-  await tester.pump();
-  return gesture;
-}
-
 Future<void> goTo(WidgetTester tester, TestGesture gesture, Offset point) async {
   await gesture.moveTo(point);
   await tester.pump(const Duration(milliseconds: 30));
 }
+
+/// The middle of a card's title, away from its handle.
+Offset cardBody(WidgetTester tester, String id) => tester.getCenter(
+  find.descendant(of: card(id), matching: find.text(tester.widget<BoardCard>(card(id)).task.title)),
+);
+
+/// Long enough for a press to pick a card up.
+const held = Duration(milliseconds: 600);
+
+/// On iPhone and iPad a finger could only move a card by its handle, and a mouse not at all (KAN-69).
+void onIOS(String description, Future<void> Function(WidgetTester tester, Size size) body) {
+  testBothLayouts('on iOS, $description', (tester, size) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      await body(tester, size);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+}
+
+Future<TestApp> pumpBoard(WidgetTester tester, FakeKaneo server, Size size) => pumpKaneoApp(
+  tester,
+  server: server,
+  size: size,
+  location: AppRoutes.board(FakeKaneo.projectId),
+);
+
+Offset inProgress(WidgetTester tester) {
+  final header = tester.getRect(find.byKey(const ValueKey('column-header-in-progress')));
+  return Offset(header.left + 20, header.center.dy);
+}
+
+String? statusOf(FakeKaneo server, String id) =>
+    server.tasks.firstWhere((t) => t['id'] == id)['status'] as String?;
 
 void main() {
   for (final kind in [PointerDeviceKind.touch, PointerDeviceKind.mouse]) {
@@ -42,7 +68,7 @@ void main() {
       );
       final gate = server.hold('api/task/reorder');
       final boardReads = server.requestsTo('api/task/tasks/').length;
-      final gesture = await startDrag(tester, 'task-1', kind);
+      final gesture = await pickUpCard(tester, 'task-1', kind: kind);
       final header = tester.getRect(find.byKey(const ValueKey('column-header-custom-plan')));
       await goTo(tester, gesture, Offset(header.left + 20, header.center.dy));
       await gesture.up();
@@ -69,7 +95,7 @@ void main() {
         location: AppRoutes.board(FakeKaneo.projectId),
       );
       final target = tester.getRect(find.byKey(const ValueKey('drop-card-task-1')));
-      final gesture = await startDrag(tester, 'task-2', kind);
+      final gesture = await pickUpCard(tester, 'task-2', kind: kind);
       await goTo(tester, gesture, target.topLeft + const Offset(100, 12));
       await gesture.up();
       await tester.pumpAndSettle();
@@ -92,7 +118,7 @@ void main() {
     );
     final before = tester.getTopLeft(card('task-1'));
     final other = tester.getTopLeft(card('task-5'));
-    final gesture = await startDrag(tester, 'task-1', PointerDeviceKind.touch);
+    final gesture = await pickUpCard(tester, 'task-1');
     final header = tester.getRect(find.byKey(const ValueKey('column-header-in-progress')));
     await goTo(tester, gesture, Offset(header.left + 20, header.center.dy));
     await gesture.up();
@@ -119,7 +145,7 @@ void main() {
     final scroll = tester
         .widget<SingleChildScrollView>(find.byKey(const ValueKey('board-horizontal')))
         .controller!;
-    final gesture = await startDrag(tester, 'task-1', PointerDeviceKind.touch);
+    final gesture = await pickUpCard(tester, 'task-1');
     await goTo(tester, gesture, Offset(size.width - 4, 150));
     await tester.pump(const Duration(milliseconds: 400));
     expect(scroll.offset, greaterThan(0));
@@ -154,5 +180,106 @@ void main() {
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
+  });
+
+  onIOS('a mouse drags the card itself to another column', (tester, size) async {
+    final server = FakeKaneo();
+    await pumpBoard(tester, server, size);
+    final gesture = await tester.startGesture(
+      cardBody(tester, 'task-1'),
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveBy(const Offset(5, 5));
+    await tester.pump();
+    await goTo(tester, gesture, inProgress(tester));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(statusOf(server, 'task-1'), 'in-progress');
+    expect(taskOpen('task-1'), findsNothing);
+  });
+
+  // A trackpad on an iPad is a mouse, and people often rest on the card before moving it.
+  onIOS('a mouse held still on the card drags it, and only a right click opens the menu', (
+    tester,
+    size,
+  ) async {
+    final server = FakeKaneo();
+    final app = await pumpBoard(tester, server, size);
+    final gesture = await tester.startGesture(
+      cardBody(tester, 'task-1'),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pump(held);
+    expect(find.text(app.i18n.t('mobile:board.moveTo')), findsNothing);
+    await gesture.moveBy(const Offset(5, 5));
+    await tester.pump();
+    await goTo(tester, gesture, inProgress(tester));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(statusOf(server, 'task-1'), 'in-progress');
+  });
+
+  onIOS('a finger picks the card itself up with a long press and moves it', (tester, size) async {
+    final server = FakeKaneo();
+    final app = await pumpBoard(tester, server, size);
+    final cards = find.byType(BoardCard).evaluate().length;
+    final gesture = await tester.startGesture(cardBody(tester, 'task-1'));
+    await tester.pump(held);
+    expect(find.byType(BoardCard), findsNWidgets(cards + 1), reason: 'The card was not picked up');
+    await goTo(tester, gesture, inProgress(tester));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(statusOf(server, 'task-1'), 'in-progress');
+    expect(find.text(app.i18n.t('mobile:board.moveTo')), findsNothing);
+    expect(taskOpen('task-1'), findsNothing);
+  });
+
+  onIOS('a long press let go of in place opens the menu and moves nothing', (tester, size) async {
+    final server = FakeKaneo();
+    final app = await pumpBoard(tester, server, size);
+    final gesture = await tester.startGesture(cardBody(tester, 'task-1'));
+    await tester.pump(held);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text(app.i18n.t('mobile:board.moveTo')), findsOneWidget);
+    expect(server.requestsTo('api/task/reorder'), isEmpty);
+    expect(statusOf(server, 'task-1'), 'to-do');
+    expect(taskOpen('task-1'), findsNothing);
+  });
+
+  onIOS('a finger that moves at once scrolls the board and leaves the card', (tester, size) async {
+    final server = FakeKaneo();
+    await pumpBoard(tester, server, size);
+    final scroll = tester
+        .widget<SingleChildScrollView>(find.byKey(const ValueKey('board-horizontal')))
+        .controller!;
+    final gesture = await tester.startGesture(cardBody(tester, 'task-1'));
+    for (var i = 0; i < 10; i++) {
+      await gesture.moveBy(const Offset(-20, 0));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(scroll.offset, greaterThan(0));
+    expect(server.requestsTo('api/task/reorder'), isEmpty);
+    expect(statusOf(server, 'task-1'), 'to-do');
+  });
+
+  onIOS('while a move saves, a long press opens the menu at once', (tester, size) async {
+    final server = FakeKaneo();
+    final app = await pumpBoard(tester, server, size);
+    final gate = server.hold('api/task/reorder');
+    final drag = await pickUpCard(tester, 'task-1');
+    await goTo(tester, drag, inProgress(tester));
+    await drag.up();
+    await tester.pump();
+    final press = await tester.startGesture(cardBody(tester, 'task-2'));
+    await tester.pump(held);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(app.i18n.t('mobile:board.moveTo')), findsOneWidget);
+    await press.up();
+    gate.release();
+    await tester.pumpAndSettle();
+    expect(statusOf(server, 'task-1'), 'in-progress');
   });
 }

@@ -9,13 +9,18 @@ const _held = Duration(milliseconds: 600);
 void main() {
   late List<Offset> asked;
 
-  Future<void> pump(WidgetTester tester, {bool enabled = true}) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    bool enabled = true,
+    Set<PointerDeviceKind>? longPressDevices,
+  }) async {
     asked = [];
     await tester.pumpWidget(
       MaterialApp(
         home: Center(
           child: MenuGestures(
             onMenu: enabled ? asked.add : null,
+            longPressDevices: longPressDevices,
             child: const SizedBox(width: 200, height: 100, child: Text('card')),
           ),
         ),
@@ -67,6 +72,22 @@ void main() {
     await first.up();
     await tester.pump();
     expect(asked, hasLength(3));
+  });
+
+  // A board card that a finger picks up leaves the long press to the mouse (KAN-69).
+  testWidgets('it long-presses only for the pointers it is given, as soon as they change', (
+    tester,
+  ) async {
+    await pump(tester, longPressDevices: {PointerDeviceKind.mouse});
+    final point = tester.getCenter(find.text('card'));
+    await tester.longPressAt(point);
+    expect(asked, isEmpty);
+    await tester.longPressAt(point, kind: PointerDeviceKind.mouse);
+    await tester.tapAt(point, buttons: kSecondaryButton);
+    expect(asked, [point, point]);
+    await pump(tester);
+    await tester.longPressAt(point);
+    expect(asked, [point]);
   });
 
   testWidgets('screen readers can still long-press it', (tester) async {

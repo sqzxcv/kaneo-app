@@ -239,11 +239,7 @@ void main() {
     );
     await search(tester, 'shown');
     final target = tester.getRect(find.byKey(ValueKey('drop-card-${shown['id']}')));
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.byKey(ValueKey('drag-handle-${last['id']}'))),
-    );
-    await gesture.moveBy(const Offset(4, 4));
-    await tester.pump();
+    final gesture = await pickUpCard(tester, last['id'] as String);
     await gesture.moveTo(target.topLeft + const Offset(100, 12));
     await tester.pump();
     await gesture.up();

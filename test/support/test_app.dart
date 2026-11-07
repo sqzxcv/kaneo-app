@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -173,4 +174,24 @@ Future<TestApp> pumpInApp(
   );
   if (settle) await tester.pumpAndSettle();
   return TestApp(container, fake, i18n);
+}
+
+/// Takes hold of a board card the way a person does: a finger holds it still first, a mouse just
+/// moves. Move the gesture to where the card should go, then lift it.
+Future<TestGesture> pickUpCard(
+  WidgetTester tester,
+  String id, {
+  PointerDeviceKind kind = PointerDeviceKind.touch,
+}) async {
+  final gesture = await tester.startGesture(
+    tester.getCenter(find.byKey(ValueKey('board-card-$id'))),
+    kind: kind,
+  );
+  if (kind == PointerDeviceKind.mouse) {
+    await gesture.moveBy(const Offset(4, 4));
+    await tester.pump();
+  } else {
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
+  }
+  return gesture;
 }
