@@ -54,6 +54,8 @@ void main() {
     server.tasks[1]['dueDate'] = '2099-01-01';
     server.addLabel('B Label', taskId: 'task-1');
     final app = await openList(tester, size, server: server);
+    await tester.tap(find.byKey(const ValueKey('expand-task-task-1')));
+    await tester.pumpAndSettle();
     final first = row('task-1');
     for (final text in ['DEMO-1', 'Set up the project', formatDueShort(app.i18n, '2000-01-01')]) {
       expect(find.descendant(of: first, matching: find.text(text)), findsOneWidget);

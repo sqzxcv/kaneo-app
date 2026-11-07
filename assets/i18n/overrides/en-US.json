@@ -40,7 +40,9 @@
 			"columnCount_one": "{{count}} column",
 			"columnCount_other": "{{count}} columns",
 			"taskCount_one": "{{count}} task",
-			"taskCount_other": "{{count}} tasks"
+			"taskCount_other": "{{count}} tasks",
+			"expandChildren": "Expand subtasks",
+			"collapseChildren": "Collapse subtasks"
 		},
 		"list": {
 			"count_one": "{{count}} item",

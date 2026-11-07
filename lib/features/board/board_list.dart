@@ -1,21 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kaneo_app/core/core.dart';
 
 import 'board_list_row.dart';
 import 'board_icons.dart';
+import 'board_data.dart';
+import 'board_hierarchy.dart';
+import 'board_expansion.dart';
 
 /// The list shares the board query, status groups, filtering and card actions.
-class BoardList extends StatefulWidget {
-  const BoardList({super.key, required this.board, required this.emptyMessage, this.onMenu});
+class BoardList extends ConsumerStatefulWidget {
+  const BoardList({
+    super.key,
+    required this.board,
+    required this.emptyMessage,
+    this.onMenu,
+    this.sourceBoard,
+  });
   final BoardData board;
+  final BoardData? sourceBoard;
   final String emptyMessage;
   final void Function(BuildContext context, BoardTask task, Offset position)? onMenu;
 
   @override
-  State<BoardList> createState() => _BoardListState();
+  ConsumerState<BoardList> createState() => _BoardListState();
 }
 
-class _BoardListState extends State<BoardList> {
+class _BoardListState extends ConsumerState<BoardList> {
   final _horizontal = ScrollController();
   @override
   void dispose() {
@@ -25,12 +36,29 @@ class _BoardListState extends State<BoardList> {
 
   @override
   Widget build(BuildContext context) {
-    final rows = <({BoardColumn column, BoardTask? task, bool empty})>[
+    final query = projectRelationsQuery(widget.board.id);
+    final relations = ref.watch(query);
+    final expanded = ref.watch(boardExpansionProvider(widget.board.id));
+    return AsyncBody(
+      value: relations,
+      onRetry: () => ref.read(query.notifier).refresh(),
+      builder: (context, data) => _list(context, data, expanded),
+    );
+  }
+
+  Widget _list(BuildContext context, List<TaskRelation> relations, Set<String> expanded) {
+    final all = boardTasks(widget.sourceBoard ?? widget.board);
+    final rows = <({BoardColumn column, HierarchyRow? hierarchy, bool empty})>[
       for (final column in widget.board.columns) ...[
-        (column: column, task: null, empty: false),
-        if (column.tasks?.isEmpty ?? true) (column: column, task: null, empty: true),
-        for (final task in column.tasks ?? <BoardTask>[])
-          (column: column, task: task, empty: false),
+        (column: column, hierarchy: null, empty: false),
+        if (column.tasks?.isEmpty ?? true) (column: column, hierarchy: null, empty: true),
+        for (final row in buildBoardHierarchy(
+          tasks: column.tasks ?? <BoardTask>[],
+          allTasks: all,
+          relations: relations,
+          expanded: expanded,
+        ))
+          (column: column, hierarchy: row, empty: false),
       ],
     ];
     final wide = context.isWide;
@@ -49,7 +77,7 @@ class _BoardListState extends State<BoardList> {
             ),
           );
         }
-        final task = row.task;
+        final task = row.hierarchy?.task;
         if (task == null) {
           return ListTile(
             key: ValueKey('list-group-${row.column.slug}'),
@@ -65,6 +93,9 @@ class _BoardListState extends State<BoardList> {
         return BoardListRow(
           key: ValueKey('list-task-${task.id}'),
           task: task,
+          hierarchy: row.hierarchy,
+          onToggle: () =>
+              ref.read(boardExpansionProvider(widget.board.id).notifier).toggle(task.id),
           projectSlug: widget.board.slug,
           wide: wide,
           isFinal: row.column.isFinal == true,

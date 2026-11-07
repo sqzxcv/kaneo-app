@@ -38,7 +38,9 @@
 		},
 		"board": {
 			"columnCount_other": "{{count}} 列",
-			"taskCount_other": "{{count}} 个任务"
+			"taskCount_other": "{{count}} 个任务",
+			"expandChildren": "展开子任务",
+			"collapseChildren": "折叠子任务"
 		},
 		"list": {
 			"count_other": "{{count}} 项"

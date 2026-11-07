@@ -237,9 +237,15 @@ class _BoardPageState extends ConsumerState<BoardPage> {
   Future<void> _refresh() async {
     if (_moving) return;
     final query = boardQuery(widget.projectId);
-    await ref.read(query.notifier).refresh();
+    final relations = projectRelationsQuery(widget.projectId);
+    await Future.wait([
+      ref.read(query.notifier).refresh(),
+      if (_listView) ref.read(relations.notifier).refresh(),
+    ]);
     if (mounted && ref.read(query).hasError) {
       showToast(context, userMessage(context, ref.read(query).error));
+    } else if (mounted && _listView && ref.read(relations).hasError) {
+      showToast(context, userMessage(context, ref.read(relations).error));
     }
   }
 
@@ -287,6 +293,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
               notificationPredicate: (notification) => notification.metrics.axis == Axis.vertical,
               child: _listView
                   ? BoardList(
+                      sourceBoard: board,
                       board: _visible(board),
                       onMenu: _menu,
                       emptyMessage: context.t(
