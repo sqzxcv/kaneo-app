@@ -124,9 +124,15 @@ void main() {
       final image = await boundary.toImage(pixelRatio: 1);
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
+      // Flutter may remove an iOS integration-test app after the run. A simulator can write to
+      // an explicitly supplied host directory, keeping evidence available after that cleanup.
+      const evidence = String.fromEnvironment('D_TEST_EVIDENCE');
       final root = await getApplicationDocumentsDirectory();
-      final directory = await Directory('${root.path}/D-KAN-51/${Platform.operatingSystem}')
-          .create(recursive: true);
+      final directory = await Directory(
+        Platform.isIOS && evidence.isNotEmpty
+            ? evidence
+            : '${root.path}/D-KAN-51/${Platform.operatingSystem}',
+      ).create(recursive: true);
       final file = File('${directory.path}/$name.png');
       await file.writeAsBytes(bytes!.buffer.asUint8List());
       debugPrint('D_SCREENSHOT ${file.path}');

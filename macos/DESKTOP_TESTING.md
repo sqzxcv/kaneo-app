@@ -44,12 +44,15 @@ FLUTTER_XCODE_PRODUCT_BUNDLE_IDENTIFIER=app.kaneo.kaneoApp.DTest \
 
 tool/with_device.sh --boot "iPad Pro 13-inch (M5)" \
   flutter test integration_test/auth_flow_test.dart -d "iPad Pro 13-inch (M5)" \
-  --dart-define-from-file=$HOME/.config/kaneo-app/dev.env
+  --dart-define-from-file=$HOME/.config/kaneo-app/dev.env \
+  --dart-define=D_TEST_EVIDENCE=/tmp/kaneo-D-KAN-51-evidence/ipad
 ```
 
 The test prints `D_RESULT` timings and `D_SCREENSHOT` paths. PNGs are saved under the test app's
 Documents/D-KAN-51 directory, outside the repository. Login screenshots are taken before entering
-credentials. Preserve the evidence before uninstalling or replacing the test app.
+credentials. On the iOS simulator, supply `D_TEST_EVIDENCE` as above: Flutter can remove the test app
+and its Documents directory at the end of the run. The supplied host directory preserves the PNGs
+after that cleanup. Preserve macOS evidence before uninstalling or replacing the test app.
 
 This flow uses memory session storage to keep account-switch testing separate from system storage.
 `integration_test/auth_test.dart` verifies actual secure storage with private `AUTH_TEST_*` defines
