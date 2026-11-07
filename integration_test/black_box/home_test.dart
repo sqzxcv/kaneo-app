@@ -43,7 +43,7 @@ class _Second {
     );
     await owner.call('POST', 'api/notification', {
       'title': 'E-Q second notice $runStamp',
-      'message': 'From the black-box tests',
+      'message': 'E-Q from the black-box tests',
       'type': 'info',
       'relatedEntityId': task['id'],
       'relatedEntityType': 'task',
@@ -214,7 +214,10 @@ void main() {
     await bb.start(Env.owner);
     await bb.nav('Inbox');
     await bb.see(bb.containing('E-Q I3 two $runStamp'), seconds: 15);
-    await bb.tap(bb.label('Mark all read').hitTestable());
+    // A button with words when wide, an icon with a tooltip when narrow.
+    await bb.tap(
+      bb.visible(bb.label('Mark all read')) ? bb.label('Mark all read') : bb.tip('Mark all read'),
+    );
     await bb.server('all read', () async => await _unread(owner) == 0);
     await bb.pumpFor(const Duration(seconds: 1));
     expect(_badge(bb), 0, reason: 'The navigation still counts unread');

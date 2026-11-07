@@ -189,7 +189,8 @@ void main() {
       await bb.scrollBoardTo(column);
       final header = bb.rectOf(bb.text(column).hitTestable());
       final under = [
-        for (final e in find.byType(RichText).hitTestable().evaluate())
+        // Built, even if the screen's edge cuts the column off.
+        for (final e in find.byType(RichText).evaluate())
           if (() {
             final r = bb.tester.getRect(find.byElementPredicate((x) => x == e));
             return r.top > header.bottom + 4 &&

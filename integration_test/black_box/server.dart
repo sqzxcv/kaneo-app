@@ -284,7 +284,7 @@ class Api {
     'api/notification',
     {
       'title': title,
-      'message': 'From the black-box tests',
+      'message': 'E-Q from the black-box tests',
       'type': type,
       if (taskId != null) ...{'relatedEntityId': taskId, 'relatedEntityType': 'task'},
       if (taskId == null) ...{'relatedEntityId': Env.workspaceId, 'relatedEntityType': 'workspace'},

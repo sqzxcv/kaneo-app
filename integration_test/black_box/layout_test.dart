@@ -449,6 +449,11 @@ void main() {
   if (!isPhone) {
     bbCase('U8', '账户、收件箱、动态在宽屏下不拉满全宽', (bb) async {
       await bb.start(Env.owner);
+      // Upright, an iPad's page is barely wider than the content may be; sideways it shows.
+      if (isTablet && !bb.landscape) {
+        await bb.setViewSize(Size(bb.window.height, bb.window.width));
+        bb.note('measured sideways, the view made ${bb.window}');
+      }
       final failures = <String>[];
       for (final page in ['Account', 'Inbox', 'Activity']) {
         await bb.nav(page);

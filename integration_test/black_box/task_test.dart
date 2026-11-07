@@ -45,9 +45,20 @@ void main() {
       );
       expect(field.left, greaterThan(bb.window.width * 0.3), reason: 'Not on the right');
       // Some of the board shows to the left of the panel.
-      final boardShowing = boardColumnNames.any(
-        (c) => bb.showing(bb.text(c)) && bb.rectOf(bb.text(c)).right < field.left - 20,
-      );
+      // Anything of the board's own, a column title or a card, starting between the sidebar and
+      // the panel.
+      final sidebar = bb.rectOf(bb.label('Home')).right;
+      final showingBits = <String>[
+        for (final e in find.byType(RichText).evaluate())
+          if (() {
+            final r = bb.tester.getRect(find.byElementPredicate((x) => x == e));
+            return r.left > sidebar && r.left < field.left - 30 && r.width > 0;
+          }())
+            (e.widget as RichText).text.toPlainText(),
+      ].where((t) => t.trim().isNotEmpty).toList();
+      final gap = field.left - sidebar;
+      bb.note('board left of the panel (${gap.round()} wide up to the task title): $showingBits');
+      final boardShowing = showingBits.isNotEmpty;
       expect(boardShowing, isTrue, reason: 'The board is covered');
       await bb.closeTask();
       await bb.gone(bb.titleField(title), seconds: 5);

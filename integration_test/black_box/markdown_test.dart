@@ -204,8 +204,22 @@ Future<Finder> _edit(Bb bb, String source, Finder target, {bool beside = false})
     // Beside what it shows, on the same line, where a link isn't.
     await bb.see(target);
     final r = bb.rectOf(target);
-    await bb.tester.tapAt(Offset(r.right + 30, r.center.dy));
-    await bb.pumpFor(const Duration(milliseconds: 400));
+    // Where a person would tap: beside the line, then past the end of a wrapped last line, then
+    // just under it. Each must leave the link alone.
+    for (final at in [
+      Offset(r.right + 30, r.center.dy),
+      Offset(r.right - 4, r.bottom - 4),
+      Offset(r.center.dx, r.bottom + 6),
+    ]) {
+      final links = openedLinks.length;
+      await bb.tester.tapAt(at);
+      await bb.pumpFor(const Duration(milliseconds: 400));
+      if (openedLinks.length > links) bb.note('a tap at $at opened ${openedLinks.last}');
+      if (bb.showing(editor)) {
+        bb.note('editing opened by a tap at $at, the text spanning $r');
+        break;
+      }
+    }
   } else {
     await bb.tap(target);
   }

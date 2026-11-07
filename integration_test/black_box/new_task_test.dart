@@ -167,10 +167,15 @@ void main() {
     final title = 'E-Q N6 task $runStamp';
     await bb.type(_title(bb), title);
     // A chip in the wide dialog; a row whose value opens it on a narrow page.
-    final value = bb.valueOf('Labels');
-    await bb.tap(
-      bb.showing(value) && bb.valueText('Labels').contains('label') ? value : bb.label('Labels'),
-    );
+    final search = bb.field('Search or create');
+    for (var i = 0; i < 2 && !bb.showing(search); i++) {
+      final value = bb.valueOf('Labels');
+      final row = bb.showing(value) && bb.valueText('Labels').contains('label');
+      await bb.tap(row ? value : bb.label('Labels'));
+      if (await bb.until(() => bb.showing(search), seconds: 4)) break;
+      bb.note('tap ${i + 1} on Labels (${row ? 'its value' : 'the chip'}) opened no picker');
+      await bb.shot('labels-tap-${i + 1}');
+    }
     final name = 'E-QL N6 $runStamp';
     await bb.type(bb.field('Search or create'), name);
     await bb.pumpFor(const Duration(milliseconds: 500));
