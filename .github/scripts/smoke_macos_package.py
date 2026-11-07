@@ -58,10 +58,14 @@ def main():
                 result.update(bundleId=info['CFBundleIdentifier'], installedFrom=args.dmg.name,
                               check='Fresh directory install, launch and Dart window initialization')
                 (evidence / 'macos-startup.json').write_text(json.dumps(result, indent=2) + '\n')
-                capture = subprocess.run(['screencapture', '-x', '-l', str(result['windowId']),
-                                          str(evidence / 'macos-startup.png')], check=False)
+                try:
+                    capture = subprocess.run(['screencapture', '-x', '-l', str(result['windowId']),
+                                              str(evidence / 'macos-startup.png')], check=False, timeout=10)
+                    captured = capture.returncode == 0
+                except subprocess.TimeoutExpired:
+                    captured = False
                 print('Installed macOS app launched and configured its desktop window.')
-                if capture.returncode:
+                if not captured:
                     print('Screenshot unavailable on this CI session; native window check passed.')
             finally:
                 if process.poll() is None:
