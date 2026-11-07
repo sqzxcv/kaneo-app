@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -133,6 +134,17 @@ void main() {
       await windowManager.ensureInitialized();
       await windowManager.setSize(const Size(1366, 1024));
     }
+    final orientationRequests = <List<String>>[];
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMessageHandler(SystemChannels.platform.name, (message) {
+      final call = SystemChannels.platform.codec.decodeMethodCall(message);
+      if (call.method == 'SystemChrome.setPreferredOrientations') {
+        orientationRequests.add(List<String>.from(call.arguments as List));
+      }
+      // Observe the request while still delivering it to the real OS.
+      return messenger.delegate.send(SystemChannels.platform.name, message);
+    });
+    addTearDown(() => messenger.setMockMessageHandler(SystemChannels.platform.name, null));
     final config = DevConfig.fromEnvironment();
     final host = Uri.parse(config.serverUrl).host;
     expect(['localhost', '127.0.0.1', '::1'], contains(host), reason: 'Local Kaneo only.');
@@ -237,8 +249,14 @@ void main() {
         await until(tester, () => tester.view.physicalSize.width > tester.view.physicalSize.height),
         isTrue,
       );
+      expect(orientationRequests.last, [
+        'DeviceOrientation.landscapeLeft',
+        'DeviceOrientation.landscapeRight',
+      ]);
       expect(find.byType(NavigationBar), findsNothing);
       expect(tester.getSize(find.byType(AppBar)).height, 48);
+    } else {
+      expect(orientationRequests.any((request) => request.isNotEmpty), isFalse);
     }
     expect(card(child.id), findsNothing);
     expect(find.descendant(of: card(parent.id), matching: find.text('1/3')), findsOneWidget);
@@ -249,20 +267,27 @@ void main() {
     );
     final header = find.byKey(ValueKey('column-header-${columns.first.slug}'));
     expect(find.descendant(of: header, matching: find.text('108 tasks')), findsOneWidget);
+    final lane = find.byKey(PageStorageKey('column-tasks-${columns.first.slug}'));
     await shot(tester, '01-board-collapsed');
     await tap(tester, find.byKey(ValueKey('expand-task-${parent.id}')));
     await tap(tester, find.byKey(ValueKey('expand-task-${child.id}')));
-    expect(card(grandchild.id), findsOneWidget);
     expect(
       tester.getTopLeft(card(child.id)).dx,
       greaterThan(tester.getTopLeft(card(parent.id)).dx),
     );
+    if (card(grandchild.id).evaluate().isEmpty) {
+      await tester.dragUntilVisible(card(grandchild.id), lane, const Offset(0, -150));
+    }
+    expect(card(grandchild.id), findsOneWidget);
     await shot(tester, '02-board-expanded');
+    tester.widget<ListView>(lane).controller!.jumpTo(0);
+    await tester.pumpAndSettle();
     await tap(tester, find.byKey(ValueKey('expand-task-${parent.id}')));
 
     await tap(tester, page(find.text('B Parent')));
     await see(tester, taskOpen(parent.id));
     await container.read(taskQuery(parent.id).future);
+    if (phone) expect(orientationRequests.last, isEmpty);
     await shot(tester, '02b-task-open');
     Navigator.of(tester.element(taskOpen(parent.id))).pop();
     await see(tester, card(parent.id));
@@ -273,7 +298,6 @@ void main() {
       );
     }
     debugPrint('B_CHECK drag');
-    final lane = find.byKey(PageStorageKey('column-tasks-${columns.first.slug}'));
     final headerBefore = tester.getTopLeft(header);
     await search(tester, 'B Drag');
     FocusManager.instance.primaryFocus?.unfocus();
@@ -406,6 +430,7 @@ void main() {
     await shot(tester, '06-filter-active');
     await tap(tester, find.byTooltip('List view'));
     await see(tester, row(parent.id));
+    if (phone) expect(orientationRequests.last, isEmpty);
     expect(find.byKey(const ValueKey('filter-count')), findsOneWidget);
     await shot(tester, '07-list-filtered');
     final listHorizontal = page(
@@ -522,10 +547,18 @@ void main() {
               .isNotEmpty,
       seconds: 5,
     );
+    clock.stop();
     debugPrint(
       'B_RESULT realtime_5_seconds ${live ? 'PASS' : 'FAIL'} ${clock.elapsedMilliseconds}ms',
     );
     await shot(tester, '12-external-update');
+    if (Platform.isMacOS) {
+      await windowManager.setSize(const Size(960, 700));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('board-horizontal')), findsOneWidget);
+      expect(find.byKey(ValueKey('column-header-${columns[1].slug}')), findsOneWidget);
+      await shot(tester, '13-narrow-window');
+    }
     final evidenceRoot = Directory(
       '${(await getApplicationDocumentsDirectory()).path}/B-KAN-49/$device',
     );
