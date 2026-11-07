@@ -38,8 +38,8 @@ FLUTTER_XCODE_PRODUCT_BUNDLE_IDENTIFIER=app.kaneo.kaneoApp.DTest \
 
 This has separate tests for native window/layout and system notification delivery. The notification
 test requires an unlocked macOS GUI session and notification permission for the DTest app
-(displayed as kaneo_app in System Settings → Notifications). It fails if permission is denied or
-no native notification is delivered. It uses in-memory sign-in, preserves the previous switch
+(displayed as kaneo_app in System Settings → Notifications). Without permission, it explicitly reports the notification case as skipped/unverified for manual
+acceptance. Once permission is granted, it fails if no native notification is delivered. It uses in-memory sign-in, preserves the previous switch
 setting, and cleans up its D- test data.
 
 ## Manual acceptance
