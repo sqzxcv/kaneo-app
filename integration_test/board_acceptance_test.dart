@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,7 +40,7 @@ Future<void> see(WidgetTester tester, Finder finder) async {
 
 Future<void> tap(WidgetTester tester, Finder finder) async {
   await see(tester, finder);
-  await tester.ensureVisible(finder);
+  if (finder.hitTestable().evaluate().isEmpty) await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pumpAndSettle();
 }
@@ -85,15 +86,15 @@ Future<void> selectMany(WidgetTester tester, String label) async {
 }
 
 Future<void> menu(WidgetTester tester, String title) async {
-  final target = page(find.text(title));
-  await tester.ensureVisible(target);
+  final target = find.descendant(of: find.byType(BoardCard), matching: find.text(title));
+  if (target.hitTestable().evaluate().isEmpty) await tester.ensureVisible(target);
   await tester.longPress(target);
   await tester.pumpAndSettle();
 }
 
 Future<TestGesture> dragStart(WidgetTester tester, String id, {bool mouse = false}) async {
   final handle = find.byKey(ValueKey('drag-handle-$id'));
-  await tester.ensureVisible(handle);
+  if (handle.hitTestable().evaluate().isEmpty) await tester.ensureVisible(handle);
   final gesture = await tester.startGesture(
     tester.getCenter(handle),
     kind: mouse ? ui.PointerDeviceKind.mouse : ui.PointerDeviceKind.touch,
@@ -231,14 +232,28 @@ void main() {
     final header = find.byKey(ValueKey('column-header-${columns.first.slug}'));
     expect(find.descendant(of: header, matching: find.text('108 tasks')), findsOneWidget);
     await shot(tester, '01-board-collapsed');
-    final firstPosition = tester.getTopLeft(card(parent.id));
     await tap(tester, find.byKey(ValueKey('expand-task-${parent.id}')));
     await tap(tester, find.byKey(ValueKey('expand-task-${child.id}')));
     expect(card(grandchild.id), findsOneWidget);
-    expect(tester.getTopLeft(card(child.id)).dx, greaterThan(firstPosition.dx));
+    expect(
+      tester.getTopLeft(card(child.id)).dx,
+      greaterThan(tester.getTopLeft(card(parent.id)).dx),
+    );
     await shot(tester, '02-board-expanded');
     await tap(tester, find.byKey(ValueKey('expand-task-${parent.id}')));
 
+    await tap(tester, page(find.text('B Parent')));
+    expect(container.read(routerProvider).state.uri.path, AppRoutes.task(parent.id));
+    await container.read(taskQuery(parent.id).future);
+    await shot(tester, '02b-task-open');
+    container.read(routerProvider).pop();
+    await see(tester, card(parent.id));
+    if (phone) {
+      expect(
+        await until(tester, () => tester.view.physicalSize.width > tester.view.physicalSize.height),
+        isTrue,
+      );
+    }
     debugPrint('B_CHECK drag');
     final lane = find.byKey(PageStorageKey('column-tasks-${columns.first.slug}'));
     final headerBefore = tester.getTopLeft(header);
@@ -263,8 +278,12 @@ void main() {
     expect(tester.getTopLeft(header), headerBefore);
     expect((await api.task(parent.id)).status, doing);
     expect((await api.task(child.id)).status, todo);
+    // The second same-column parent still owns the child in the display hierarchy.
+    expect(card(child.id), findsNothing);
+    await tap(tester, find.byKey(ValueKey('expand-task-${target.id}')));
     expect(card(child.id), findsOneWidget);
     await shot(tester, '03-parent-moved');
+    await tap(tester, find.byKey(ValueKey('expand-task-${target.id}')));
     // Put the parent back using the shared long-press menu.
     await search(tester, 'B Parent');
     await menu(tester, 'B Parent');
@@ -298,12 +317,26 @@ void main() {
     final vertical = tester.widget<ListView>(lane).controller!;
     final top = tester.getTopLeft(header);
     final timer = Stopwatch()..start();
-    await tester.dragUntilVisible(
-      find.text('B Load 099'),
-      lane,
-      const Offset(0, -500),
-      maxIteration: 40,
-    );
+    if (Platform.isMacOS) {
+      for (var i = 0; i < 60 && find.text('B Load 099').evaluate().isEmpty; i++) {
+        await tester.sendEventToBinding(
+          PointerScrollEvent(
+            position: tester.getCenter(lane),
+            scrollDelta: const Offset(0, 500),
+            kind: ui.PointerDeviceKind.mouse,
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.text('B Load 099'), findsOneWidget);
+    } else {
+      await tester.dragUntilVisible(
+        find.text('B Load 099'),
+        lane,
+        const Offset(0, -500),
+        maxIteration: 40,
+      );
+    }
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(header), top);
     expect(find.byType(BoardCard).evaluate().length, lessThan(60));
@@ -311,13 +344,18 @@ void main() {
     await shot(tester, '04-hundred-cards');
     vertical.jumpTo(0);
     await tester.pumpAndSettle();
-    await tester.drag(lane, const Offset(0, 350));
+    final laneRect = tester.getRect(lane);
+    await tester.dragFrom(Offset(laneRect.left + 3, laneRect.center.dy), const Offset(0, 350));
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.byType(RefreshIndicator), findsOneWidget);
     expect(find.byType(RefreshProgressIndicator).evaluate().length, lessThanOrEqualTo(1));
     await tester.pumpAndSettle();
 
     debugPrint('B_CHECK filters');
+    await tap(tester, find.byIcon(LucideIcons.listFilter));
+    await shot(tester, '05b-filter-menu');
+    await tap(tester, find.text('Overdue only').last);
+    await tap(tester, find.byTooltip('Reset'));
     await search(tester, 'B missing');
     expect(
       find.text(container.read(i18nProvider).t('mobile:board.noTasksMatchTheFilters')),
@@ -374,6 +412,7 @@ void main() {
     await search(tester, 'B Parent');
     await closeSearch(tester);
     await tap(tester, page(find.text(project.name)));
+    await shot(tester, '09b-project-picker');
     final chooser = find.byType(PopoverSurface).evaluate().isNotEmpty
         ? find.byType(PopoverSurface)
         : find.byType(BottomSheet);
@@ -410,10 +449,16 @@ void main() {
 
     // External-client change: record its real outcome without hiding a pending A-line dependency.
     final clock = Stopwatch()..start();
+    await api.updateStatus(parent.id, doing);
     await api.updateTitle(parent.id, 'B Parent external update');
     final live = await until(
       tester,
-      () => find.text('B Parent external update').evaluate().isNotEmpty,
+      () =>
+          find.text('B Parent external update').evaluate().isNotEmpty &&
+          find
+              .descendant(of: find.byKey(ValueKey('drop-column-$doing')), matching: card(parent.id))
+              .evaluate()
+              .isNotEmpty,
       seconds: 5,
     );
     debugPrint(
