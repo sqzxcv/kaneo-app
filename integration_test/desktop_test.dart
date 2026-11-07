@@ -90,7 +90,12 @@ void main() {
     expect(find.byType(NavigationBar), findsNothing);
     debugPrint('Desktop minimum window and wide layout passed.');
 
-    final permission = await host.requestNotificationPermission();
+    final permission = await host.requestNotificationPermission().timeout(
+      const Duration(seconds: 30),
+      onTimeout: () => throw StateError(
+        'macOS notification permission did not return; unlock the GUI and grant DTest permission.',
+      ),
+    );
     expect(
       permission,
       isTrue,
