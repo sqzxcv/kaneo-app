@@ -13,6 +13,7 @@ import 'package:kaneo_app/app.dart';
 import 'package:kaneo_app/bootstrap.dart';
 import 'package:kaneo_app/core/core.dart';
 import 'package:kaneo_app/features/auth/login_page.dart';
+import 'package:kaneo_app/features/shell/app_sidebar.dart';
 import 'package:kaneo_app/features/task/task_page.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
@@ -175,9 +176,7 @@ void main() {
     await _until(
       tester,
       'API key sockets',
-      () =>
-          opened.contains('apiKey:api/ws/user') &&
-          opened.any((path) => path.startsWith('apiKey:api/ws/project/')),
+      () => opened.contains('apiKey:api/ws/user') && opened.contains('apiKey:api/ws/${project.id}'),
     );
     await fixture.ownerApi.updateStatus(task.id, columns[1].slug);
     await fixture.ownerApi.updateTitle(task.id, 'D Updated by another client');
@@ -196,6 +195,15 @@ void main() {
       seconds: 5,
     );
     await shot('03-api-key-board-realtime');
+    if (Platform.isMacOS) {
+      await windowManager.setSize(minimumDesktopWindowSize);
+      await tester.pumpAndSettle();
+      final context = tester.element(find.byType(AppSidebar));
+      expect(MediaQuery.sizeOf(context).shortestSide, greaterThanOrEqualTo(600));
+      expect(find.byType(NavigationBar), findsNothing);
+      await shot('03b-minimum-window');
+      await windowManager.setSize(const Size(1366, 1024));
+    }
     container.read(routerProvider).go(AppRoutes.inbox);
     final inbox = notificationsQuery(project.workspaceId);
     await _until(tester, 'initial inbox', () => container.read(inbox).hasValue);
@@ -214,7 +222,7 @@ void main() {
       'API key live notification',
       () =>
           container.read(inbox).value?.any((n) => n.resourceId == assigned.id) == true &&
-          find.text(assigned.title).evaluate().isNotEmpty,
+          find.textContaining(assigned.title).evaluate().isNotEmpty,
       seconds: 5,
     );
     final notification = container
@@ -250,7 +258,7 @@ void main() {
     container.read(routerProvider).go(AppRoutes.inbox);
     await _until(tester, 'second account inbox', () => container.read(inbox).hasValue);
     expect(container.read(inbox).requireValue.any((n) => n.id == notification.id), isFalse);
-    expect(find.text(assigned.title), findsNothing);
+    expect(find.textContaining(assigned.title), findsNothing);
     await shot('06-second-account-inbox');
     await logout();
     await shot('07-logged-out');
