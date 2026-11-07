@@ -19,6 +19,8 @@ import 'package:kaneo_app/features/shell/app_shell.dart' show shellPageKey;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../test/support/test_app.dart' show taskOpen;
+
 const device = String.fromEnvironment('BOARD_TEST_DEVICE', defaultValue: 'device');
 final captureKey = GlobalKey();
 Finder card(String id) => find.byKey(ValueKey('board-card-$id'));
@@ -245,10 +247,10 @@ void main() {
     await tap(tester, find.byKey(ValueKey('expand-task-${parent.id}')));
 
     await tap(tester, page(find.text('B Parent')));
-    expect(container.read(routerProvider).state.uri.path, AppRoutes.task(parent.id));
+    await see(tester, taskOpen(parent.id));
     await container.read(taskQuery(parent.id).future);
     await shot(tester, '02b-task-open');
-    container.read(routerProvider).pop();
+    Navigator.of(tester.element(taskOpen(parent.id))).pop();
     await see(tester, card(parent.id));
     if (phone) {
       expect(
@@ -432,6 +434,9 @@ void main() {
         ? find.byType(PopoverSurface)
         : find.byType(BottomSheet);
     await tap(tester, find.descendant(of: chooserBack, matching: find.text(project.name)));
+    if (find.byTooltip('List view').evaluate().isNotEmpty) {
+      await tap(tester, find.byTooltip('List view'));
+    }
     await see(tester, row(parent.id));
 
     debugPrint('B_CHECK reopen');
@@ -455,6 +460,9 @@ void main() {
     await tap(tester, find.byTooltip('Refresh'));
     await tester.pumpAndSettle();
 
+    await container.read(boardQuery(project.id).future);
+    await container.read(projectRelationsQuery(project.id).future);
+    await tester.pump(const Duration(milliseconds: 300));
     // External-client change: record its real outcome without hiding a pending A-line dependency.
     final clock = Stopwatch()..start();
     await api.updateStatus(parent.id, doing);
