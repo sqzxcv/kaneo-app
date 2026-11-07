@@ -11,8 +11,8 @@ import 'legacy_html.dart';
 import 'markdown_syntax.dart';
 import 'markdown_urls.dart';
 
-const double _textSize = 15;
-const double _lineHeight = 1.6;
+const double markdownTextSize = 15;
+const double markdownLineHeight = 1.6;
 
 /// The web caps an image it has not been told to resize at 44rem.
 const double _maxImageWidth = 704;
@@ -22,9 +22,15 @@ const markdownImageLoadingKey = ValueKey('markdown-image-loading');
 
 /// Shows task descriptions and comments, including Kaneo's own tags and old HTML descriptions.
 class MarkdownView extends ConsumerWidget {
-  const MarkdownView({super.key, required this.data});
+  const MarkdownView({super.key, required this.data, this.onTapText});
 
   final String data;
+
+  /// Called on a tap on the text. A tap on a link still only opens the link.
+  ///
+  /// The renderer keeps what it built until [data] changes, so a different function passed later
+  /// may never be called. Pass one function, and let it decide when to do nothing.
+  final VoidCallback? onTapText;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -33,6 +39,7 @@ class MarkdownView extends ConsumerWidget {
     return MarkdownBody(
       data: isLegacyHtml(data) ? legacyHtmlToMarkdown(data) : data,
       selectable: true,
+      onTapText: onTapText,
       fitContent: false,
       styleSheet: style,
       listItemCrossAxisAlignment: MarkdownListItemCrossAxisAlignment.start,
@@ -78,7 +85,7 @@ Future<void> _openLink(BuildContext context, WidgetRef ref, String? href) async 
 MarkdownStyleSheet _styleSheet(BuildContext context) {
   final colors = context.colors;
   final body = Theme.of(context).textTheme.bodyMedium!
-      .copyWith(fontSize: _textSize, height: _lineHeight, color: colors.foreground);
+      .copyWith(fontSize: markdownTextSize, height: markdownLineHeight, color: colors.foreground);
   TextStyle heading(double size) => body.copyWith(
     fontSize: size,
     height: 1.26,
@@ -95,11 +102,11 @@ MarkdownStyleSheet _styleSheet(BuildContext context) {
     h2Padding: headingPadding,
     h3: heading(16),
     h3Padding: headingPadding,
-    h4: heading(_textSize),
+    h4: heading(markdownTextSize),
     h4Padding: headingPadding,
-    h5: heading(_textSize),
+    h5: heading(markdownTextSize),
     h5Padding: headingPadding,
-    h6: heading(_textSize),
+    h6: heading(markdownTextSize),
     h6Padding: headingPadding,
     strong: const TextStyle(fontWeight: FontWeight.w600),
     em: const TextStyle(fontStyle: FontStyle.italic),
@@ -111,7 +118,7 @@ MarkdownStyleSheet _styleSheet(BuildContext context) {
     ),
     code: TextStyle(
       fontFamily: KaneoFonts.mono,
-      fontSize: _textSize * 0.84,
+      fontSize: markdownTextSize * 0.84,
       backgroundColor: colors.codeHighlight,
     ),
     codeblockPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -186,7 +193,7 @@ class _Checkbox extends StatelessWidget {
       alignment: Alignment.topLeft,
       child: Padding(
         // Centers the box on the first line of text.
-        padding: const EdgeInsets.only(top: (_textSize * _lineHeight - 16) / 2),
+        padding: const EdgeInsets.only(top: (markdownTextSize * markdownLineHeight - 16) / 2),
         child: Semantics(
           checked: checked,
           child: Icon(

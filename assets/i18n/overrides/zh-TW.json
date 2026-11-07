@@ -29,6 +29,13 @@
 			"imageFailed": "圖片載入失敗",
 			"linkFailed": "無法開啟此連結"
 		},
+		"description": {
+			"saving": "正在儲存…",
+			"saved": "已儲存",
+			"notSaved": "尚未儲存，文字仍保留在這裡。",
+			"saveFailed": "描述儲存失敗：{{reason}}",
+			"empty": "暫無描述"
+		},
 		"board": {
 			"columnCount_other": "{{count}} 欄",
 			"taskCount_other": "{{count}} 個任務"

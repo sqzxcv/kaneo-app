@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/core.dart';
-import '../markdown/markdown_view.dart';
+import 'task_description.dart';
 
 /// Placeholder until KAN-34.
 class TaskPage extends ConsumerWidget {
@@ -23,7 +23,7 @@ class TaskPage extends ConsumerWidget {
           children: [
             Text(task.title, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            MarkdownView(data: task.description ?? ''),
+            TaskDescription(task: task),
           ],
         ),
       ),

@@ -29,6 +29,13 @@
 			"imageFailed": "Image failed to load",
 			"linkFailed": "Couldn't open this link"
 		},
+		"description": {
+			"saving": "Saving…",
+			"saved": "Saved",
+			"notSaved": "Not saved. Your text is still here.",
+			"saveFailed": "Couldn't save the description: {{reason}}",
+			"empty": "No description"
+		},
 		"board": {
 			"columnCount_one": "{{count}} column",
 			"columnCount_other": "{{count}} columns",

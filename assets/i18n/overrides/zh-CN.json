@@ -29,6 +29,13 @@
 			"imageFailed": "图片加载失败",
 			"linkFailed": "无法打开此链接"
 		},
+		"description": {
+			"saving": "正在保存…",
+			"saved": "已保存",
+			"notSaved": "未保存，文字仍保留在这里。",
+			"saveFailed": "描述保存失败：{{reason}}",
+			"empty": "暂无描述"
+		},
 		"board": {
 			"columnCount_other": "{{count}} 列",
 			"taskCount_other": "{{count}} 个任务"
