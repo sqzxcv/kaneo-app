@@ -30,6 +30,7 @@ class BoardLanes extends ConsumerStatefulWidget {
     this.onMenu,
     this.emptyMessage,
     this.sourceBoard,
+    this.onDragging,
   });
   final BoardData board;
   final BoardData? sourceBoard;
@@ -37,6 +38,9 @@ class BoardLanes extends ConsumerStatefulWidget {
   final bool busy;
   final void Function(BuildContext context, BoardTask task, Offset position)? onMenu;
   final void Function(String id, String status, int index) onMove;
+
+  /// A card was picked up, or let go of.
+  final ValueChanged<bool>? onDragging;
 
   @override
   ConsumerState<BoardLanes> createState() => _BoardLanesState();
@@ -52,12 +56,14 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
   String? _dragging;
 
   void _start(String id) {
+    widget.onDragging?.call(true);
     setState(() => _dragging = id);
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(milliseconds: 16), (_) => _scroll());
   }
 
   void _end() {
+    widget.onDragging?.call(false);
     _timer?.cancel();
     _timer = null;
     _pointer = null;

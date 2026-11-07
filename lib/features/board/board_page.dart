@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:kaneo_app/core/core.dart';
 
+import '../realtime/board_sync.dart';
 import '../task/open_task.dart';
 import 'board_lanes.dart';
 import 'board_list.dart';
@@ -252,6 +253,7 @@ class _BoardPageState extends ConsumerState<BoardPage> {
   Widget build(BuildContext context) {
     final query = boardQuery(widget.projectId);
     final value = ref.watch(query);
+    ref.watch(boardSyncProvider(widget.projectId)).saving = () => _moving;
     return BoardOrientation(
       projectId: widget.projectId,
       enabled: !_listView,
@@ -316,6 +318,8 @@ class _BoardPageState extends ConsumerState<BoardPage> {
                       busy: _moving,
                       onMove: _moveVisible,
                       onMenu: _menu,
+                      onDragging: (dragging) =>
+                          ref.read(boardSyncProvider(widget.projectId)).dragging = dragging,
                       emptyMessage: _filters.active
                           ? context.t('mobile:board.noTasksMatchTheFilters')
                           : null,

@@ -534,7 +534,8 @@ void main() {
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      await tester.pump();
+      // Back in front, the app also reads again what is open.
+      await tester.pumpAndSettle();
     });
 
     testBothLayouts('goes to the task it was typed in, even when moving to another', (

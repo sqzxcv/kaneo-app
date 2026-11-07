@@ -934,6 +934,35 @@ class Task {
   );
 }
 
+/// The subtask progress of a task's parent, read along with the task for a board.
+class ParentSubtaskCounts {
+  const ParentSubtaskCounts({required this.taskId, required this.counts});
+
+  factory ParentSubtaskCounts.fromJson(Map<String, dynamic> json) =>
+      ParentSubtaskCounts(taskId: json['taskId'] as String, counts: SubtaskCounts.fromJson(json));
+
+  final String taskId;
+  final SubtaskCounts counts;
+}
+
+/// One task as a board shows it, without reading the board. The progress of its parents comes along,
+/// because that is what a change of status changes elsewhere on the board.
+class TaskForBoard {
+  const TaskForBoard({required this.task, this.subtaskCounts, this.parentSubtaskCounts = const []});
+
+  factory TaskForBoard.fromJson(Map<String, dynamic> json) => TaskForBoard(
+    task: Task.fromJson(json),
+    subtaskCounts: _object(json['subtaskCounts'], SubtaskCounts.fromJson),
+    parentSubtaskCounts:
+        _list(json['parentSubtaskCounts'], ParentSubtaskCounts.fromJson) ??
+        const <ParentSubtaskCounts>[],
+  );
+
+  final Task task;
+  final SubtaskCounts? subtaskCounts;
+  final List<ParentSubtaskCounts> parentSubtaskCounts;
+}
+
 class DescriptionPage {
   const DescriptionPage({required this.content, required this.version, this.nextOffset});
 

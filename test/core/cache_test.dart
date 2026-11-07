@@ -117,6 +117,104 @@ void main() {
       expect(container.read(workspacesQuery).requireValue.single.id, FakeKaneo.workspaceId);
     });
 
+    test('the revision moves on with every load and every change of the data', () async {
+      final server = FakeKaneo();
+      final container = await _container(server);
+      final sub = container.listen(workspacesQuery, (_, _) {});
+      addTearDown(sub.close);
+      final data = await container.read(workspacesQuery.future);
+      final notifier = container.read(workspacesQuery.notifier);
+      final start = notifier.revision;
+      final refresh = notifier.refresh();
+      expect(notifier.revision, start + 1);
+      await refresh;
+      expect(notifier.revision, start + 1, reason: 'A load that ends changes nothing further.');
+      notifier.setData(data);
+      expect(notifier.revision, start + 2);
+    });
+
+    group('the open queries', () {
+      test('refresh what is in use, and nothing else', () async {
+        final server = FakeKaneo();
+        final container = await _container(server);
+        final workspaces = container.listen(workspacesQuery, (_, _) {});
+        final me = container.listen(meQuery, (_, _) {});
+        addTearDown(workspaces.close);
+        addTearDown(me.close);
+        await container.read(workspacesQuery.future);
+        await container.read(meQuery.future);
+        await _settle();
+        final workspaceReads = server.requestsTo('api/workspace').length;
+        final meReads = server.requestsTo('api/user/me').length;
+        final projectReads = server.requestsTo('api/project').length;
+
+        container.read(openQueriesProvider).refresh();
+        await _settle();
+        expect(server.requestsTo('api/workspace').length, workspaceReads + 1);
+        expect(server.requestsTo('api/user/me').length, meReads + 1);
+        expect(server.requestsTo('api/project').length, projectReads);
+      });
+
+      test('can leave some out, by key', () async {
+        final server = FakeKaneo();
+        final container = await _container(server);
+        final workspaces = container.listen(workspacesQuery, (_, _) {});
+        final me = container.listen(meQuery, (_, _) {});
+        addTearDown(workspaces.close);
+        addTearDown(me.close);
+        await container.read(workspacesQuery.future);
+        await container.read(meQuery.future);
+        await _settle();
+        final workspaceReads = server.requestsTo('api/workspace').length;
+        final meReads = server.requestsTo('api/user/me').length;
+
+        container.read(openQueriesProvider).refresh(where: (key) => key == 'me');
+        await _settle();
+        expect(server.requestsTo('api/workspace').length, workspaceReads);
+        expect(server.requestsTo('api/user/me').length, meReads + 1);
+      });
+
+      test('forget a query no page uses any more', () async {
+        final server = FakeKaneo();
+        final container = await _container(server);
+        final sub = container.listen(workspacesQuery, (_, _) {});
+        await container.read(workspacesQuery.future);
+        sub.close();
+        await _settle();
+        final reads = server.requestsTo('api/workspace').length;
+        container.read(openQueriesProvider).refresh();
+        await _settle();
+        expect(server.requestsTo('api/workspace').length, reads);
+      });
+
+      test('let a first load finish instead of starting it over', () async {
+        final server = FakeKaneo();
+        final container = await _container(server);
+        final gate = server.hold('api/workspace');
+        final sub = container.listen(workspacesQuery, (_, _) {});
+        addTearDown(sub.close);
+        await _settle();
+        final reads = server.requestsTo('api/workspace').length;
+        container.read(openQueriesProvider).refresh();
+        await _settle();
+        expect(server.requestsTo('api/workspace').length, reads);
+        gate.release();
+        expect((await container.read(workspacesQuery.future)).single.id, FakeKaneo.workspaceId);
+      });
+
+      test('try a page again that failed to load', () async {
+        final server = FakeKaneo()..failNext('api/workspace', status: 500);
+        final container = await _container(server);
+        final sub = container.listen(workspacesQuery, (_, _) {});
+        addTearDown(sub.close);
+        await _settle();
+        expect(container.read(workspacesQuery).hasError, isTrue);
+        container.read(openQueriesProvider).refresh();
+        await _settle();
+        expect(container.read(workspacesQuery).requireValue.single.id, FakeKaneo.workspaceId);
+      });
+    });
+
     test('keeps the data on screen while refreshing', () async {
       final server = FakeKaneo();
       final container = await _container(server);

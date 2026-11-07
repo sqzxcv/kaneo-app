@@ -1,5 +1,5 @@
 // Local B-line acceptance. Run only through tool/with_device.sh with dev.env.
-// Creates new B-prefixed projects; never edits the seeded/shared projects.
+// Creates new projects with BOARD_TEST_PREFIX in front; never edits the seeded/shared projects.
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -24,6 +24,9 @@ import 'package:window_manager/window_manager.dart';
 import '../test/support/test_app.dart' show taskOpen;
 
 const device = String.fromEnvironment('BOARD_TEST_DEVICE', defaultValue: 'device');
+
+/// What the projects this creates start with, so that a line can keep to its own data.
+const prefix = String.fromEnvironment('BOARD_TEST_PREFIX', defaultValue: 'B');
 final captureKey = GlobalKey();
 Finder card(String id) => find.byKey(ValueKey('board-card-$id'));
 Finder row(String id) => find.byKey(ValueKey('list-task-$id'));
@@ -162,16 +165,16 @@ void main() {
     var api = container.read(kaneoApiProvider);
     final stamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
     final project = await api.createProject(
-      name: 'B-$device-$stamp',
+      name: '$prefix-$device-$stamp',
       workspaceId: config.workspaceId,
       icon: 'Layout',
-      slug: 'B${stamp.toUpperCase()}',
+      slug: '$prefix${stamp.toUpperCase()}',
     );
     final other = await api.createProject(
-      name: 'B-Second-$device-$stamp',
+      name: '$prefix-Second-$device-$stamp',
       workspaceId: config.workspaceId,
       icon: 'Layout',
-      slug: 'BS${stamp.toUpperCase()}',
+      slug: '${prefix}S${stamp.toUpperCase()}',
     );
     final initial = await api.columns(project.id);
     await api.updateColumn(initial[0].id, name: '需求池');
@@ -540,19 +543,23 @@ void main() {
     await shot(tester, '10-board-restored');
     // Keep the parent at the top and collapse before testing a real server rejection.
     await tap(tester, find.byKey(ValueKey('expand-task-${parent.id}')));
-    final rollbackBefore = tester.getTopLeft(card(moving.id));
-    await api.deleteTask(moving.id); // only our test task, concurrent deletion leaves a stale card.
-    await dragTo(tester, moving.id, tester.getTopLeft(nextHeader) + const Offset(20, 20));
+    // Deleted elsewhere while the card is in the air. Only our test task. Nothing changes under a
+    // drag, so the server turns down the move, and then the deletion comes through.
+    final inTheAir = await dragStart(tester, moving.id);
+    await inTheAir.moveTo(tester.getTopLeft(nextHeader) + const Offset(20, 20));
+    await tester.pump(const Duration(milliseconds: 80));
+    await api.deleteTask(moving.id);
+    await inTheAir.up();
     await see(tester, find.textContaining('Tasks must belong'));
-    expect(tester.getTopLeft(card(moving.id)), rollbackBefore);
     await shot(tester, '11-rejected-move');
+    expect(await until(tester, () => card(moving.id).evaluate().isEmpty, seconds: 5), isTrue);
     await tap(tester, find.byTooltip('Refresh'));
     await tester.pumpAndSettle();
 
     await container.read(boardQuery(project.id).future);
     await container.read(projectRelationsQuery(project.id).future);
     await tester.pump(const Duration(milliseconds: 300));
-    // External-client change: record its real outcome without hiding a pending A-line dependency.
+    // A change by another client, which is KAN-57's regression check: B11 of the black-box tests.
     final clock = Stopwatch()..start();
     await api.updateStatus(parent.id, doing);
     await api.updateTitle(parent.id, 'B Parent external update');
@@ -607,5 +614,6 @@ void main() {
     );
     debugPrint('B_EVIDENCE ${report.path}');
     expect(frameworkError, isNull);
+    expect(live, isTrue, reason: 'Not updated within 5 seconds: ${clock.elapsedMilliseconds} ms');
   }, timeout: const Timeout(Duration(minutes: 12)));
 }

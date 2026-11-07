@@ -18,9 +18,16 @@ Uri authenticatedSocketUrl(Session session, String path) {
 
 /// Native WebSockets use the same bearer/API key headers as HTTP; tokens never go in the URL.
 /// The caller owns stream handling, keepalive, reconnects and closing on session/lifecycle changes.
-IOWebSocketChannel connectAuthenticatedSocket(Session session, String path) =>
-    IOWebSocketChannel.connect(
-      authenticatedSocketUrl(session, path),
-      headers: credentialHeaders(session.credentialType, session.token),
-      connectTimeout: const Duration(seconds: 15),
-    );
+///
+/// With [pingInterval] the socket pings the server at that interval, and closes itself when no answer
+/// comes, which is the only sign of a network that went away without saying so.
+IOWebSocketChannel connectAuthenticatedSocket(
+  Session session,
+  String path, {
+  Duration? pingInterval,
+}) => IOWebSocketChannel.connect(
+  authenticatedSocketUrl(session, path),
+  headers: credentialHeaders(session.credentialType, session.token),
+  connectTimeout: const Duration(seconds: 15),
+  pingInterval: pingInterval,
+);

@@ -27,6 +27,7 @@ Future<({ProviderContainer container, FakeKaneo server, FakeDesktopHost host})> 
     sessionStorageProvider.overrideWithValue(MemorySessionStorage(session)),
     initialSessionProvider.overrideWithValue(session),
     httpAdapterProvider.overrideWithValue(fake),
+    realtimeSocketProvider.overrideWithValue(fake.connectSocket),
     isDesktopProvider.overrideWithValue(true),
     desktopHostProvider.overrideWithValue(host),
   ];

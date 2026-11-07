@@ -194,6 +194,9 @@ class TaskEdits {
   int _queued = 0;
   KeepAliveLink? _keepAlive;
 
+  /// Whether a change is still on its way. Reading the task now could give the state before it.
+  bool get saving => _queued > 0;
+
   /// [leaving] is for a page being taken down, when nothing on screen may rebuild yet.
   void setTitle(String title, {bool leaving = false}) {
     void edit() => _edit((t) => t.copyWith(title: title), (api) => api.updateTitle(taskId, title));

@@ -383,6 +383,7 @@ void main() {
         'api/task/tasks/{project}',
         'api/task/assigned?workspaceId={workspace}',
         'api/task/{task}?view=detail',
+        'api/task/{task}?view=board',
         'api/task/{task}/description?offset=0',
         'api/column/{project}',
         'api/activity/{task}',

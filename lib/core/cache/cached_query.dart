@@ -32,8 +32,15 @@ class CachedQuery<T> extends AsyncNotifier<T> {
 
   int _latestLoad = 0;
 
+  /// Moves on whenever a load starts or the data is replaced. Whoever reads part of the data from the
+  /// server compares this afterwards, because what it read may be older than what is here by then.
+  int get revision => _latestLoad;
+
   @override
   FutureOr<T> build() {
+    final open = ref.read(openQueriesProvider);
+    open._queries.add(this);
+    ref.onDispose(() => open._queries.remove(this));
     final store = ref.watch(cacheStoreProvider);
     final remembered = store.peek(_spec.key);
     if (remembered != null) {
@@ -90,6 +97,10 @@ class CachedQuery<T> extends AsyncNotifier<T> {
     }
   }
 
+  void _refreshUnlessStarting() {
+    if (!state.isLoading || state.hasValue) unawaited(refresh());
+  }
+
   /// Replaces the data right away, such as for an optimistic update, and remembers it.
   void setData(T value) {
     _latestLoad++;
@@ -102,6 +113,20 @@ class CachedQuery<T> extends AsyncNotifier<T> {
   void forget() {
     _latestLoad++;
     unawaited(ref.read(cacheStoreProvider).remove(_spec.key));
+  }
+}
+
+/// The queries in use right now, for when everything on screen may have gone out of date.
+final openQueriesProvider = Provider<OpenQueries>((_) => OpenQueries());
+
+class OpenQueries {
+  final Set<CachedQuery<Object?>> _queries = {};
+
+  /// Refreshes the queries [where] picks by key. A first load still under way is left to finish.
+  void refresh({bool Function(String key)? where}) {
+    for (final query in _queries.toList()) {
+      if (where == null || where(query._spec.key)) query._refreshUnlessStarting();
+    }
   }
 }
 

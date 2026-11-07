@@ -21,6 +21,8 @@ export 'i18n/resolve_locale.dart';
 export 'layout/breakpoints.dart';
 export 'layout/content_width.dart';
 export 'providers.dart';
+export 'realtime/realtime.dart';
+export 'realtime/realtime_connection.dart';
 export 'router/app_router.dart';
 export 'session/session.dart';
 export 'session/authentication.dart';

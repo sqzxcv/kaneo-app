@@ -83,6 +83,7 @@ Future<List<Override>> _overrides(
     prefsProvider.overrideWithValue(await SharedPreferences.getInstance()),
     i18nProvider.overrideWithValue(i18n),
     httpAdapterProvider.overrideWithValue(server),
+    realtimeSocketProvider.overrideWithValue(server.connectSocket),
     sessionStorageProvider.overrideWithValue(sessionStorage ?? MemorySessionStorage(session)),
     initialSessionProvider.overrideWithValue(session),
     initialLocationProvider.overrideWithValue(location),

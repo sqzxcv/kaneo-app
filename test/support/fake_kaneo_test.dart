@@ -278,4 +278,111 @@ void main() {
       throwsA(isA<ApiError>().having((e) => e.status, 'status', 404)),
     );
   });
+
+  group('a task read for a board', () {
+    test('has its progress and that of its parents in the project', () async {
+      final read = await api.taskForBoard('task-2');
+      expect(read.task.id, 'task-2');
+      expect(read.task.workspaceId, isNull);
+      expect(read.subtaskCounts!.total, 0);
+      final parent = read.parentSubtaskCounts.single;
+      expect(parent.taskId, 'task-1');
+      expect(parent.counts.total, 1);
+      expect(server.requests.last.query['view'], 'board');
+    });
+
+    test('leaves out a parent in another project', () async {
+      server.tasks.firstWhere((t) => t['id'] == 'task-1')['projectId'] = FakeKaneo.secondProjectId;
+      expect((await api.taskForBoard('task-2')).parentSubtaskCounts, isEmpty);
+    });
+  });
+
+  group('sockets', () {
+    const session = Session(
+      serverUrl: FakeKaneo.serverUrl,
+      credentialType: CredentialType.apiKey,
+      token: FakeKaneo.apiKey,
+      userId: FakeKaneo.userId,
+      userName: 'Test User',
+      userEmail: FakeKaneo.email,
+    );
+
+    test('open for a good credential, and carry what is sent', () async {
+      final socket = server.connectSocket(session, FakeKaneo.userSocket);
+      await socket.ready;
+      expect(server.openSockets(FakeKaneo.userSocket), [socket]);
+      final frame = socket.stream.first;
+      server.emit(FakeKaneo.userSocket, 'NOTIFICATION_CREATED', {'a': 1});
+      expect(await frame, '{"type":"NOTIFICATION_CREATED","a":1}');
+      socket.sink.add('{"type":"ping"}');
+      expect(socket.sent, ['{"type":"ping"}']);
+    });
+
+    test('accept a session token as well', () async {
+      final socket = server.connectSocket(
+        const Session(
+          serverUrl: FakeKaneo.serverUrl,
+          credentialType: CredentialType.bearer,
+          token: FakeKaneo.sessionToken,
+          userId: FakeKaneo.userId,
+          userName: 'Test User',
+          userEmail: FakeKaneo.email,
+        ),
+        FakeKaneo.userSocket,
+      );
+      await socket.ready;
+      expect(socket.isOpen, isTrue);
+    });
+
+    for (final (name, change) in <(String, void Function(FakeKaneo))>[
+      ('the server is unreachable', (s) => s.unreachable = true),
+      ('the credentials are revoked', (s) => s.credentialsRevoked = true),
+      ('sockets are refused', (s) => s.refuseSockets = true),
+    ]) {
+      test('fail when $name', () async {
+        change(server);
+        final socket = server.connectSocket(session, FakeKaneo.userSocket);
+        await expectLater(socket.ready, throwsA(isA<SocketExceptionForTests>()));
+        expect(socket.isOpen, isFalse);
+      });
+    }
+
+    test('fail for a bad key', () async {
+      final socket = server.connectSocket(
+        const Session(
+          serverUrl: FakeKaneo.serverUrl,
+          credentialType: CredentialType.apiKey,
+          token: 'wrong',
+          userId: FakeKaneo.userId,
+          userName: '',
+          userEmail: '',
+        ),
+        FakeKaneo.userSocket,
+      );
+      await expectLater(socket.ready, throwsA(isA<SocketExceptionForTests>()));
+    });
+
+    test('reach only their own path, and drop with the code given', () async {
+      final user = server.connectSocket(session, FakeKaneo.userSocket);
+      final project = server.connectSocket(session, FakeKaneo.projectSocket('p'));
+      await Future.wait([user.ready, project.ready]);
+      final frames = <Object?>[];
+      project.stream.listen(frames.add);
+      server.emit(FakeKaneo.userSocket, 'X');
+      await pumpEventQueue();
+      expect(frames, isEmpty);
+      server.dropSockets(code: 1008, reason: 'gone');
+      expect(project.closeCode, 1008);
+      expect(project.closeReason, 'gone');
+      expect(server.sockets.where((s) => s.isOpen), isEmpty);
+    });
+
+    test('close from the app end, and refuse more text after', () async {
+      final socket = server.connectSocket(session, FakeKaneo.userSocket);
+      await socket.ready;
+      await socket.sink.close();
+      expect(socket.isOpen, isFalse);
+      expect(() => socket.sink.add('x'), throwsStateError);
+    });
+  });
 }

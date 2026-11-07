@@ -270,6 +270,10 @@ class KaneoApi {
 
   Future<Task> task(String id) => _getOne('api/task/$id', Task.fromJson, {'view': 'detail'});
 
+  /// A task as a board shows it, for bringing one card up to date.
+  Future<TaskForBoard> taskForBoard(String id) =>
+      _getOne('api/task/$id', TaskForBoard.fromJson, {'view': 'board'});
+
   Future<Task> taskByTicketId(String ticketId, {String? workspaceId}) => _getOne(
     'api/task/by-ticket-id/${Uri.encodeComponent(ticketId)}',
     Task.fromJson,

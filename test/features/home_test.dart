@@ -352,6 +352,8 @@ void main() {
       expect(find.text('Friday, November 6'), findsNothing);
       expect(find.text(app.i18n.t('mobile:time.goodMorning')), findsOneWidget);
       expect(find.text(app.i18n.t('mobile:time.goodEvening')), findsNothing);
+      // Back in front, the app also reads again what is open.
+      await tester.pumpAndSettle();
     });
 
     testBothLayouts('also update when another page was open meanwhile', (tester, size) async {

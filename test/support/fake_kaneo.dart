@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:kaneo_app/core/session/session.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// One request the fake received, for asserting what a page sent.
 class FakeRequest {
@@ -77,6 +79,87 @@ class _NotFound implements Exception {
 ///     server.failNext('api/task/tasks/', status: 500);
 ///
 /// It plugs in underneath Dio through `httpAdapterProvider`, so the whole client runs for real.
+/// A WebSocket from [FakeKaneo.connectSocket]. It answers to nothing but what a test sends with
+/// [FakeKaneo.emit], and remembers what the app sent.
+class FakeSocket implements WebSocketChannel {
+  FakeSocket(this.path, this.session);
+
+  final String path;
+  final Session session;
+
+  /// The text frames the app sent.
+  final List<Object?> sent = [];
+
+  bool get isOpen => !_frames.isClosed;
+
+  final _frames = StreamController<Object?>.broadcast(sync: true);
+  final _ready = Completer<void>();
+  int? _closeCode;
+  String? _closeReason;
+
+  void _open() => _ready.complete();
+
+  void _refuse() {
+    _ready.future.ignore();
+    _ready.completeError(const SocketExceptionForTests());
+    unawaited(_frames.close());
+  }
+
+  void _send(Object? frame) => _frames.add(frame);
+
+  void _drop(int? code, String? reason) {
+    _closeCode = code;
+    _closeReason = reason;
+    unawaited(_frames.close());
+  }
+
+  @override
+  Future<void> get ready => _ready.future;
+
+  @override
+  Stream<dynamic> get stream => _frames.stream;
+
+  @override
+  WebSocketSink get sink => _FakeSink(this);
+
+  @override
+  int? get closeCode => _closeCode;
+
+  @override
+  String? get closeReason => _closeReason;
+
+  @override
+  String? get protocol => null;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// What a socket fails with when the server can't be reached.
+class SocketExceptionForTests implements Exception {
+  const SocketExceptionForTests();
+}
+
+class _FakeSink implements WebSocketSink {
+  _FakeSink(this._socket);
+
+  final FakeSocket _socket;
+
+  @override
+  void add(Object? data) {
+    if (!_socket.isOpen) throw StateError('The socket is closed.');
+    _socket.sent.add(data);
+  }
+
+  @override
+  Future<void> close([int? closeCode, String? closeReason]) async {
+    if (_socket.isOpen) _socket._drop(closeCode, closeReason);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 /// `test/contract/` checks these shapes against a local Kaneo.
 class FakeKaneo implements HttpClientAdapter {
   FakeKaneo() {
@@ -532,6 +615,60 @@ class FakeKaneo implements HttpClientAdapter {
   bool _matches(String? method, Pattern pattern, FakeRequest request) =>
       (method == null || method == request.method) && request.path.contains(pattern);
 
+  // --- WebSockets ---
+
+  /// Every socket so far, in order. The app's own writes send nothing on them: use [emit].
+  final List<FakeSocket> sockets = [];
+
+  /// Sockets fail while requests work, as behind a proxy that doesn't pass them on.
+  bool refuseSockets = false;
+
+  /// The path of a project's socket, and of the account's.
+  static String projectSocket(String projectId) => 'api/ws/$projectId';
+  static const userSocket = 'api/ws/user';
+
+  /// The sockets on [path] that are open now.
+  List<FakeSocket> openSockets(String path) => [
+    for (final socket in sockets)
+      if (socket.path == path && socket.isOpen) socket,
+  ];
+
+  /// Goes in `realtimeSocketProvider`. Like the real server, it refuses without a valid credential,
+  /// and fails when the server can't be reached.
+  FakeSocket connectSocket(Session session, String path) {
+    final socket = FakeSocket(path, session);
+    sockets.add(socket);
+    final accepted =
+        !unreachable &&
+        !refuseSockets &&
+        !credentialsRevoked &&
+        session.token == (session.credentialType == CredentialType.apiKey ? apiKey : sessionToken);
+    scheduleMicrotask(accepted ? socket._open : socket._refuse);
+    return socket;
+  }
+
+  /// Sends an event to the sockets on [path] that are open.
+  void emit(String path, String type, [Map<String, Object?> fields = const {}]) {
+    final frame = jsonEncode({'type': type, ...fields});
+    for (final socket in openSockets(path)) {
+      socket._send(frame);
+    }
+  }
+
+  /// Sends raw text to the sockets on [path] that are open.
+  void emitRaw(String path, String frame) {
+    for (final socket in openSockets(path)) {
+      socket._send(frame);
+    }
+  }
+
+  /// Closes the sockets that are open from the server's end. Set [unreachable] too for a lost network.
+  void dropSockets({int? code, String? reason}) {
+    for (final socket in sockets) {
+      if (socket.isOpen) socket._drop(code, reason);
+    }
+  }
+
   FakeResponse _respond(FakeRequest request) {
     for (final override in _overrides) {
       if (!_matches(override.method, override.pattern, request)) continue;
@@ -641,6 +778,30 @@ class FakeKaneo implements HttpClientAdapter {
       'assigneeName': assignee['name'],
       'assigneeId': task['userId'],
       'workspaceId': workspaceId,
+    };
+  }
+
+  /// A task as `GET api/task/:id?view=board` returns it, with the progress of its parents.
+  Map<String, dynamic> _taskForBoard(Map<String, dynamic> task) {
+    final detail = {..._taskDetail(task)}..remove('workspaceId');
+    final parents = [
+      for (final relation in relations)
+        if (relation['targetTaskId'] == task['id'] && relation['relationType'] == 'subtask')
+          ...tasks.where(
+            (t) => t['id'] == relation['sourceTaskId'] && t['projectId'] == task['projectId'],
+          ),
+    ];
+    return {
+      ...detail,
+      'descriptionDeferred': false,
+      'subtaskCounts': _boardTask(task)['subtaskCounts'],
+      'parentSubtaskCounts': [
+        for (final parent in parents)
+          {
+            'taskId': parent['id'],
+            ...(_boardTask(parent)['subtaskCounts'] as Map<String, dynamic>),
+          },
+      ],
     };
   }
 
@@ -1347,7 +1508,8 @@ class FakeKaneo implements HttpClientAdapter {
       };
     });
     _route('GET', 'api/task/:id', (request, params) {
-      return _taskDetail(_find(tasks, params[0], 'Task'));
+      final task = _find(tasks, params[0], 'Task');
+      return request.query['view'] == 'board' ? _taskForBoard(task) : _taskDetail(task);
     });
     _route('POST', 'api/task/:projectId', (request, params) {
       _find(projects, params[0], 'Project');

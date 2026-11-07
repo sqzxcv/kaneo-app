@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/core.dart';
 import '../inbox/notifications.dart';
+import '../realtime/user_sync.dart';
 import 'app_sidebar.dart';
 
 /// Marks the page next to the navigation, so that tests can look inside the page only.
@@ -63,6 +64,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(userSyncProvider);
     final page = KeyedSubtree(key: shellPageKey, child: widget.child);
     if (context.isWide) return _WideShell(location: widget.location, page: page);
     return _NarrowShell(location: widget.location, page: page);
