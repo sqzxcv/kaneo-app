@@ -26,6 +26,43 @@ The local contract test creates its own D- workspace/project and temporary accou
 real assignment notification through the runtime, checks the task ID, and cleans up its data.
 It uses password sessions to avoid the API key request limit.
 
+## Login, realtime and account isolation
+
+`integration_test/auth_flow_test.dart` runs against the local server on macOS and iPad. It disables
+developer auto-login and uses the real login page, HTTP client and authenticated WebSockets. It
+checks API key board updates and incoming inbox notifications without a manual refresh, opens the
+notified task, then signs out through the account page and signs in with a second local account.
+The former account's private workspace and notifications must be absent, and its disk cache must
+be cleared. On macOS it also checks the native minimum window size. It creates and removes only
+its own D- workspaces, projects and temporary account.
+
+```sh
+# Use the fixed DTest bundle and the same local signing identity for each macOS run (see below).
+FLUTTER_XCODE_PRODUCT_BUNDLE_IDENTIFIER=app.kaneo.kaneoApp.DTest \
+  tool/with_device.sh flutter test integration_test/auth_flow_test.dart -d macos \
+  --dart-define-from-file=$HOME/.config/kaneo-app/dev.env
+
+tool/with_device.sh --boot "iPad Pro 13-inch (M5)" \
+  flutter test integration_test/auth_flow_test.dart -d "iPad Pro 13-inch (M5)" \
+  --dart-define-from-file=$HOME/.config/kaneo-app/dev.env
+```
+
+The test prints `D_RESULT` timings and `D_SCREENSHOT` paths. PNGs are saved under the test app's
+Documents/D-KAN-51 directory, outside the repository. Login screenshots are taken before entering
+credentials. Preserve the evidence before uninstalling or replacing the test app.
+
+This flow uses memory session storage to keep account-switch testing separate from system storage.
+`integration_test/auth_test.dart` verifies actual secure storage with private `AUTH_TEST_*` defines
+and no `KANEO_DEV_*` defines. Use a new `AUTH_TEST_STORAGE_KEY`, run `AUTH_TEST_PHASE=save`, then run
+`AUTH_TEST_PHASE=restore` in a separate process with the same bundle ID and signing identity. The
+restore pass checks the saved identity against the server and clears the test entry on logout.
+
+An inbox update is not evidence of an OS notification banner. The flow keeps native notifications
+off and restores the prior local preference afterwards; native delivery and banner clicking are
+covered separately below.
+
+## Native notifications
+
 For macOS native testing, use the D line's fixed test bundle ID and its existing local signing
 identity as specified in AGENTS.md. Keep that identity consistent between runs. Do not change the
 formal bundle ID or put signing identities or development credentials in the repository.
