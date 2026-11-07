@@ -156,4 +156,52 @@ void main() {
     await api.detachLabel(changes.detach.single);
     expect(await api.taskLabels(task.id), isEmpty);
   }, skip: _serverUrl.isEmpty ? 'Pass dev.env to run this against a local Kaneo.' : null);
+
+  // KAN-66: a label made on a task is in the workspace only as that task's copy.
+  test('a label only another task has goes on a task as a copy of its own', () async {
+    expect(_isLocal, isTrue, reason: _serverUrl);
+    final api = await _signIn();
+    final stamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36).toUpperCase();
+    final project = await api.createProject(
+      name: 'C-task-labels-$stamp',
+      workspaceId: _workspaceId,
+      icon: 'Layout',
+      slug: 'CL$stamp',
+    );
+    addTearDown(() => api.deleteProject(project.id));
+    final status = (await api.columns(project.id)).first.slug;
+    Future<Task> make(String title) => api.createTask(
+      project.id,
+      CreateTaskBody(title: title, description: '', priority: 'no-priority', status: status),
+    );
+    final holder = await make('Holder');
+    final task = await make('Borrower');
+    final name = 'C-only-$stamp';
+    await api.createLabel(name: name, color: 'teal', workspaceId: _workspaceId, taskId: holder.id);
+    Future<List<String>> names(String taskId) async => [
+      for (final l in await api.taskLabels(taskId)) l.name,
+    ];
+
+    // It is offered, as the holder's copy, and the task gets one of its own.
+    final offered = taskLabelOptions(await api.workspaceLabels(_workspaceId), task.id);
+    final theirs = offered.singleWhere((l) => l.name == name);
+    expect(theirs.taskId, holder.id);
+    final changes = labelChanges(attached: const [], options: offered, selected: {theirs.id});
+    expect(changes.attach, isEmpty);
+    expect(changes.copy, [theirs]);
+    await addTaskLabel(api, theirs, taskId: task.id, workspaceId: _workspaceId);
+    expect(await names(task.id), [name]);
+    expect(await names(holder.id), [name]);
+    expect((await api.taskLabels(task.id)).single.color, 'teal');
+    expect(
+      (await api.workspaceLabels(_workspaceId)).where((l) => l.name == name && l.taskId == null),
+      isEmpty,
+    );
+
+    // Attaching the holder's copy instead would have taken it off the holder. FakeKaneo does this too.
+    final other = await make('Mover');
+    await api.attachLabel(theirs.id, other.id);
+    expect(await names(other.id), [name]);
+    expect(await names(holder.id), isEmpty);
+  }, skip: _serverUrl.isEmpty ? 'Pass dev.env to run this against a local Kaneo.' : null);
 }

@@ -115,9 +115,11 @@ Task revertTaskEdit(Task current, {required Task before, required Task after}) {
   );
 }
 
-/// The labels to offer on a task: one for each name, the workspace's own where there is one. Other
-/// tasks' copies are left out, and so is anything on its way to being deleted.
+/// The labels to offer on a task: one for each name in the workspace, leaving out anything on its
+/// way to being deleted. Each is the workspace's own label where there is one, else the task's own
+/// copy, else another task's copy: a label made on a task is in the workspace only as copies.
 List<Label> taskLabelOptions(List<Label> workspaceLabels, String taskId) {
+  int rank(Label label) => label.taskId == null ? 0 : (label.taskId == taskId ? 1 : 2);
   final deleting = {
     for (final label in workspaceLabels)
       if (label.deletionStartedAt != null) label.name,
@@ -125,26 +127,47 @@ List<Label> taskLabelOptions(List<Label> workspaceLabels, String taskId) {
   final byName = <String, Label>{};
   for (final label in workspaceLabels) {
     if (deleting.contains(label.name)) continue;
-    if (label.taskId != null && label.taskId != taskId) continue;
     final existing = byName[label.name];
-    if (existing == null || (label.taskId == null && existing.taskId != null)) {
-      byName[label.name] = label;
-    }
+    if (existing == null || rank(label) < rank(existing)) byName[label.name] = label;
   }
   return byName.values.toList();
 }
 
+/// Puts [label], one of [taskLabelOptions] that isn't on the task yet, on the task [taskId] of
+/// [workspaceId].
+///
+/// A label of the workspace's own is copied onto the task. One that only other tasks have is made
+/// again for this one, with its color: attaching it would move it, taking it off the task it is on.
+Future<void> addTaskLabel(
+  KaneoApi api,
+  Label label, {
+  required String taskId,
+  required String workspaceId,
+}) async {
+  if (label.taskId == null) return api.attachLabel(label.id, taskId);
+  if (label.taskId == taskId) return;
+  await api.createLabel(
+    name: label.name,
+    color: label.color,
+    workspaceId: workspaceId,
+    taskId: taskId,
+  );
+}
+
 /// What it takes to go from the labels on a task to a selection among the offered ones.
 class LabelChanges {
-  const LabelChanges({required this.attach, required this.detach});
+  const LabelChanges({required this.attach, required this.detach, this.copy = const []});
 
-  /// Ids of the labels to copy onto the task.
+  /// Ids of the workspace's labels to copy onto the task.
   final List<String> attach;
+
+  /// Labels only other tasks have, to make again on this one. See [addTaskLabel].
+  final List<Label> copy;
 
   /// Ids of the task's own copies to remove.
   final List<String> detach;
 
-  bool get isEmpty => attach.isEmpty && detach.isEmpty;
+  bool get isEmpty => attach.isEmpty && copy.isEmpty && detach.isEmpty;
 }
 
 /// The ids in [options] of the labels already on the task. Copies are matched by name.
@@ -164,14 +187,24 @@ LabelChanges labelChanges({
   required Set<String> selected,
 }) {
   final current = selectedLabelIds(attached, options);
+  final byId = {for (final option in options) option.id: option};
+  final added = [
+    for (final id in selected)
+      if (!current.contains(id)) id,
+  ];
   final removed = {
     for (final option in options)
       if (current.contains(option.id) && !selected.contains(option.id)) option.name,
   };
   return LabelChanges(
     attach: [
-      for (final id in selected)
-        if (!current.contains(id)) id,
+      for (final id in added)
+        if (byId[id]?.taskId == null) id,
+    ],
+    // An option with a task, and not on this one yet, is another task's: the task's own are on it.
+    copy: [
+      for (final id in added)
+        if (byId[id]?.taskId != null) byId[id]!,
     ],
     detach: [
       for (final label in attached)
@@ -244,12 +277,18 @@ class TaskEdits {
     if (!_ref.mounted) return;
     final api = _ref.read(kaneoApiProvider);
     _enqueue(() async {
+      final taskWorkspace = _ref.mounted ? _ref.read(taskQuery(taskId)).value?.workspaceId : null;
       try {
         for (final id in changes.detach) {
           await api.detachLabel(id);
         }
         for (final id in changes.attach) {
           await api.attachLabel(id, taskId);
+        }
+        for (final label in changes.copy) {
+          final workspaceId = label.workspaceId ?? taskWorkspace;
+          if (workspaceId == null) continue;
+          await addTaskLabel(api, label, taskId: taskId, workspaceId: workspaceId);
         }
       } catch (error) {
         _report(error);

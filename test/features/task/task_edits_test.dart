@@ -187,14 +187,26 @@ void main() {
       expect([for (final o in options) o.id], ['bug', 'ui']);
     });
 
-    test('leaves out other tasks\' copies and labels being deleted', () {
+    test('leaves out labels being deleted', () {
       final options = taskLabelOptions([
-        _label('other', 'theirs', taskId: 't2'),
         _label('gone', 'old', deleting: '2027-01-01'),
         _label('gone-copy', 'old', taskId: 't1'),
         _label('mine', 'only here', taskId: 't1'),
       ], 't1');
       expect([for (final o in options) o.id], ['mine']);
+    });
+
+    // KAN-66.
+    test('offers a name only other tasks have, by one of their copies', () {
+      final options = taskLabelOptions([
+        _label('other', 'theirs', taskId: 't2'),
+        _label('another', 'theirs', taskId: 't3'),
+        _label('shared-copy', 'shared', taskId: 't2'),
+        _label('shared', 'shared'),
+        _label('mine-there', 'both', taskId: 't2'),
+        _label('mine', 'both', taskId: 't1'),
+      ], 't1');
+      expect([for (final o in options) o.id], ['other', 'shared', 'mine']);
     });
   });
 
@@ -220,6 +232,20 @@ void main() {
       final changes = labelChanges(attached: attached, options: options, selected: {'bug', 'new'});
       expect(changes.attach, ['new']);
       expect(changes.detach, isEmpty);
+    });
+
+    // KAN-66: attaching another task's copy would take it off that task.
+    test('makes a label only other tasks have again, instead of attaching theirs', () {
+      final theirs = _label('theirs', 'theirs', taskId: 't2');
+      final changes = labelChanges(
+        attached: attached,
+        options: [...options, theirs],
+        selected: {'bug', 'theirs'},
+      );
+      expect(changes.attach, isEmpty);
+      expect(changes.copy, [theirs]);
+      expect(changes.detach, isEmpty);
+      expect(changes.isEmpty, isFalse);
     });
 
     test('keeps a label on the task that was not offered', () {

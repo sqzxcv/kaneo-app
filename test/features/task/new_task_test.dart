@@ -620,6 +620,32 @@ void main() {
       );
     });
 
+    // KAN-66: a label only other tasks had wasn't offered.
+    testBothLayouts('one only another task has is offered, and stays on that task', (
+      tester,
+      size,
+    ) async {
+      final server = FakeKaneo()..labels.clear();
+      server.addLabel('theirs', color: 'teal', taskId: 'task-3');
+      await _openFromBoard(tester, size, server: server);
+      await tester.enterText(_title, 'Borrowing a label');
+      await _press(tester, _labels);
+      await tester.tap(find.text('theirs').last);
+      await tester.pump();
+      await tester.tap(find.text('Save').last);
+      await tester.pumpAndSettle();
+      expect(_shown(_labels, 'theirs'), findsOneWidget);
+
+      await _press(tester, _create);
+      final task = _newTask(server, 'Borrowing a label');
+      expect(
+        server.labels.where((l) => l['name'] == 'theirs' && l['taskId'] == task['id']),
+        hasLength(1),
+      );
+      expect(server.labels.where((l) => l['taskId'] == 'task-3'), hasLength(1));
+      expect(server.labels.where((l) => l['taskId'] == null), isEmpty);
+    });
+
     testBothLayouts('making one has its own permission', (tester, size) async {
       final server = FakeKaneo()..capabilities['createLabels'] = false;
       await _openFromBoard(tester, size, server: server);

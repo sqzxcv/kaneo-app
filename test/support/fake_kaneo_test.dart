@@ -67,6 +67,29 @@ void main() {
     });
   });
 
+  // KAN-66: see test/contract/task_edits_contract_test.dart.
+  test(
+    'labels go on tasks as copies, and another task\'s copy moves, as on the real server',
+    () async {
+      List<String?> holders(String name) => [
+        for (final l in server.labels)
+          if (l['name'] == name) l['taskId'] as String?,
+      ];
+      final workspace = await api.createLabel(name: 'ws', color: 'red', workspaceId: 'w');
+      await api.attachLabel(workspace.id, 'task-1');
+      await api.attachLabel(workspace.id, 'task-1');
+      expect(holders('ws'), [null, 'task-1']);
+
+      final theirs = server.addLabel('theirs', taskId: 'task-3');
+      await api.createLabel(name: 'theirs', color: 'red', workspaceId: 'w', taskId: 'task-1');
+      await api.createLabel(name: 'theirs', color: 'red', workspaceId: 'w', taskId: 'task-1');
+      expect(holders('theirs'), ['task-3', 'task-1']);
+
+      await api.attachLabel(theirs['id'] as String, 'task-2');
+      expect(holders('theirs'), ['task-1', 'task-2']);
+    },
+  );
+
   // KAN-60: comments stayed behind, and then every read of the workspace's activity failed.
   test('deleting a project takes what hangs off its tasks, as on the real server', () async {
     server.addComment('task-1', 'Goes with the project');

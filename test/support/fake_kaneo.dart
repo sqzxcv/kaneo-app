@@ -358,6 +358,14 @@ class FakeKaneo implements HttpClientAdapter {
     return label;
   }
 
+  /// A task has one copy of each label name: the server answers with the one it has already.
+  Map<String, dynamic> _labelOnTask(String name, String color, String? taskId) {
+    final existing = taskId == null
+        ? null
+        : labels.where((l) => l['taskId'] == taskId && l['name'] == name).firstOrNull;
+    return existing ?? addLabel(name, color: color, taskId: taskId);
+  }
+
   Map<String, dynamic> addRelation(String sourceTaskId, String targetTaskId, [String? type]) {
     final relation = <String, dynamic>{
       'id': _id('relation'),
@@ -1693,19 +1701,19 @@ class FakeKaneo implements HttpClientAdapter {
     _route('GET', 'api/label/task/:taskId', (request, params) => _taskLabels(params[0]));
     _route('POST', 'api/label', (request, params) {
       final body = _body(request);
-      return addLabel(
+      return _labelOnTask(
         body['name'] as String,
-        color: body['color'] as String,
-        taskId: body['taskId'] as String?,
+        body['color'] as String,
+        body['taskId'] as String?,
       );
     });
     _route('PUT', 'api/label/:id/task', (request, params) {
       final label = _find(labels, params[0], 'Label');
-      return addLabel(
-        label['name'] as String,
-        color: label['color'] as String,
-        taskId: _body(request)['taskId'] as String?,
-      );
+      final taskId = _body(request)['taskId'] as String?;
+      if (label['taskId'] == taskId) return label;
+      // Like the server, this moves a label that is on another task: it comes off that one.
+      if (label['taskId'] != null) labels.remove(label);
+      return _labelOnTask(label['name'] as String, label['color'] as String, taskId);
     });
     _route('DELETE', 'api/label/:id/task', (request, params) {
       final label = _find(labels, params[0], 'Label');

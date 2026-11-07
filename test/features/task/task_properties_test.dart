@@ -445,6 +445,39 @@ void main() {
       expect(_inCard('task-1', find.text('ui')), findsNothing);
     });
 
+    // KAN-66: a label only other tasks had wasn't offered, so the only way was a new one.
+    testBothLayouts('a label only another task has can be picked, and stays on that task', (
+      tester,
+      size,
+    ) async {
+      final server = FakeKaneo()..labels.clear();
+      server.addLabel('theirs', color: 'teal', taskId: 'task-3');
+      final app = await _openFromBoard(tester, size, server: server);
+      await _press(tester, _labels);
+      final option = find.descendant(of: find.byType(PopoverBody), matching: find.text('theirs'));
+      expect(option, findsOneWidget);
+      expect(find.text(app.i18n.t('mobile:taskFields.noLabels')), findsNothing);
+      await tester.tap(option);
+      await tester.pump();
+      await tester.tap(find.text(app.i18n.t('mobile:common.save')).last);
+      await tester.pumpAndSettle();
+
+      expect(onTask(server, 'task-1'), ['theirs']);
+      expect(onTask(server, 'task-3'), ['theirs']);
+      expect(server.labels.where((l) => l['taskId'] == null), isEmpty);
+      expect(server.labels.firstWhere((l) => l['taskId'] == 'task-1')['color'], 'teal');
+      _shown(tester, _labels, 'theirs');
+      await _close(tester, size);
+      expect(_inCard('task-1', find.text('theirs')), findsOneWidget);
+      expect(_inCard('task-3', find.text('theirs')), findsOneWidget);
+
+      // Taking it off again leaves the other task's.
+      await _press(tester, _card('task-1'));
+      await toggle(tester, app, ['theirs']);
+      expect(onTask(server, 'task-1'), isEmpty);
+      expect(onTask(server, 'task-3'), ['theirs']);
+    });
+
     testBothLayouts('saving the same selection sends nothing', (tester, size) async {
       final server = labelled();
       final app = await _openFromBoard(tester, size, server: server);

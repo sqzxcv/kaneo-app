@@ -80,7 +80,7 @@ class NewTasks {
       var added = true;
       for (final label in labels) {
         try {
-          await api.attachLabel(label.id, task.id);
+          await addTaskLabel(api, label, taskId: task.id, workspaceId: workspaceId);
         } catch (_) {
           added = false;
         }
