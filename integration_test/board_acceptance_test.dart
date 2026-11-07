@@ -490,6 +490,25 @@ void main() {
     await tap(tester, find.descendant(of: chooser, matching: find.text(other.name)));
     await see(tester, page(find.text(other.name)));
     expect(find.byKey(const ValueKey('filter-count')), findsNothing);
+    if (find.byTooltip('Board view').evaluate().isNotEmpty) {
+      await tap(tester, find.byTooltip('Board view'));
+    }
+    final emptyColumn = (await api.columns(other.id))[1];
+    await tap(tester, find.byKey(ValueKey('add-task-empty-${emptyColumn.slug}')));
+    await see(tester, find.byKey(const ValueKey('new-task-title')));
+    await shot(tester, '09c-column-create');
+    const createdTitle = 'B First task from an empty column';
+    await tester.enterText(find.byKey(const ValueKey('new-task-title')), createdTitle);
+    await tester.pumpAndSettle();
+    await tap(tester, find.byKey(const ValueKey('new-task-create')));
+    await see(tester, find.text(createdTitle));
+    final storedOther = (await api.board(other.id)).data;
+    final created = storedOther.columns
+        .expand((column) => column.tasks ?? <BoardTask>[])
+        .singleWhere((task) => task.title == createdTitle);
+    expect(created.projectId, other.id);
+    expect(created.status, emptyColumn.slug);
+    await shot(tester, '09d-empty-project-created');
     await tap(tester, page(find.text(other.name)));
     final chooserBack = find.byType(PopoverSurface).evaluate().isNotEmpty
         ? find.byType(PopoverSurface)
@@ -572,6 +591,7 @@ void main() {
     final evidenceRoot = Directory(
       '${(await getApplicationDocumentsDirectory()).path}/B-KAN-49/$device',
     );
+    final frameworkError = tester.takeException();
     final report = File('${evidenceRoot.path}/results.json');
     await report.writeAsString(
       jsonEncode({
@@ -581,10 +601,11 @@ void main() {
         'realtimeWithinFiveSeconds': live,
         'realtimeElapsedMs': clock.elapsedMilliseconds,
         'phoneLandscape': phone,
-        'completed': true,
+        'completed': frameworkError == null,
+        'frameworkError': frameworkError?.toString(),
       }),
     );
     debugPrint('B_EVIDENCE ${report.path}');
-    expect(tester.takeException(), isNull);
+    expect(frameworkError, isNull);
   }, timeout: const Timeout(Duration(minutes: 12)));
 }
