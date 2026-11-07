@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/core.dart';
+import '../shell/page_return.dart';
 import '../shell/workspace_gate.dart';
 import '../shell/workspace_switch.dart';
 
@@ -109,6 +110,15 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
     if (_showArchived) ref.read(allProjectsQuery(widget.workspaceId).notifier).refresh(),
   ]);
 
+  /// This page stays open under whatever was opened from it, such as a board where tasks got done,
+  /// so nothing reads the progress again. On wide windows the sidebar does, whenever the page changes.
+  void _returned() {
+    if (!context.isWide) unawaited(ref.read(projectsQuery(widget.workspaceId).notifier).refresh());
+    if (_showArchived) {
+      unawaited(ref.read(allProjectsQuery(widget.workspaceId).notifier).refresh());
+    }
+  }
+
   EdgeInsets _padding(BuildContext context) {
     if (!context.isWide) return const EdgeInsets.fromLTRB(16, 16, 16, 24);
     // The web app's `px-6 py-10 lg:px-10`.
@@ -125,44 +135,47 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
     // The list stays on screen while the archived projects are on their way.
     final showAll = allValue != null && (allValue.hasValue || !allValue.isLoading);
     final query = showAll ? all : active;
-    return RefreshIndicator(
-      onRefresh: _refresh,
-      child: ListView(
-        children: [
-          ContentWidth(
-            maxWidth: _pageMaxWidth,
-            child: Padding(
-              padding: _padding(context),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _Today(),
-                  const SizedBox(height: 28),
-                  _SectionHeader(
-                    title: context.t('workspace:home.projects.title'),
-                    action: context.t(
-                      _showArchived ? 'mobile:home.hideArchived' : 'mobile:home.showArchived',
+    return PageReturn(
+      onReturn: _returned,
+      child: RefreshIndicator(
+        onRefresh: _refresh,
+        child: ListView(
+          children: [
+            ContentWidth(
+              maxWidth: _pageMaxWidth,
+              child: Padding(
+                padding: _padding(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _Today(),
+                    const SizedBox(height: 28),
+                    _SectionHeader(
+                      title: context.t('workspace:home.projects.title'),
+                      action: context.t(
+                        _showArchived ? 'mobile:home.hideArchived' : 'mobile:home.showArchived',
+                      ),
+                      onAction: () => setState(() => _showArchived = !_showArchived),
                     ),
-                    onAction: () => setState(() => _showArchived = !_showArchived),
-                  ),
-                  const SizedBox(height: 12),
-                  AsyncBody(
-                    value: showAll ? allValue : activeValue,
-                    onRetry: () => ref.read(query.notifier).refresh(),
-                    isEmpty: (projects) => projects.isEmpty,
-                    empty: StatusMessage(
-                      title: context.t('mobile:home.empty.title'),
-                      message: context.t('mobile:home.empty.message'),
+                    const SizedBox(height: 12),
+                    AsyncBody(
+                      value: showAll ? allValue : activeValue,
+                      onRetry: () => ref.read(query.notifier).refresh(),
+                      isEmpty: (projects) => projects.isEmpty,
+                      empty: StatusMessage(
+                        title: context.t('mobile:home.empty.title'),
+                        message: context.t('mobile:home.empty.message'),
+                      ),
+                      builder: (context, projects) => context.isWide
+                          ? _ProjectGrid(projects: projects)
+                          : _ProjectGroup(projects: projects),
                     ),
-                    builder: (context, projects) => context.isWide
-                        ? _ProjectGrid(projects: projects)
-                        : _ProjectGroup(projects: projects),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -328,7 +341,7 @@ class _ProjectCard extends StatelessWidget {
           ),
           child: InkWell(
             onTap: () => context.push(AppRoutes.board(project.id)),
-            hoverColor: c.accent.withValues(alpha: 0.4),
+            hoverColor: c.accent.faded(0.4),
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Column(

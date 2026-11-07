@@ -75,7 +75,7 @@ class _ActivityRow extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () => openTask(context, activity.taskId, projectId: activity.projectId),
-          hoverColor: c.accent.withValues(alpha: 0.5),
+          hoverColor: c.accent.faded(0.5),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
@@ -109,7 +109,7 @@ class _ActivityRow extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                           decoration: BoxDecoration(
-                            color: c.muted.withValues(alpha: 0.7),
+                            color: c.muted.faded(0.7),
                             borderRadius: BorderRadius.circular(KaneoRadius.lg),
                           ),
                           child: Text(

@@ -206,6 +206,27 @@ void main() {
       expect(app.container.read(routerProvider).state.uri.path, AppRoutes.board('p0'));
     });
 
+    // KAN-48: the page stays open under a board, so on a phone nothing read the progress again.
+    testBothLayouts('come back up to date from a page opened over them', (tester, size) async {
+      final server = _withProjects(['First']);
+      final app = await pumpKaneoApp(tester, server: server, size: size);
+      final router = app.container.read(routerProvider);
+      router.push(AppRoutes.account);
+      await tester.pumpAndSettle();
+      server.addProject(id: 'later', name: 'Added on the web', slug: 'LATER');
+      final reads = server.requestsTo('api/project', method: 'GET').length;
+
+      router.pop();
+      await tester.pumpAndSettle();
+
+      expect(inPage(find.text('Added on the web')), findsOneWidget);
+      expect(
+        server.requestsTo('api/project', method: 'GET').length,
+        reads + 1,
+        reason: 'Once, whether the page or the sidebar asks.',
+      );
+    });
+
     testBothLayouts('uses the language of the app', (tester, size) async {
       final server = _withProjects(['项目']);
       final app = await pumpKaneoApp(tester, server: server, size: size, locale: 'zh-CN');

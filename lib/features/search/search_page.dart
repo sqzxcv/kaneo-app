@@ -242,7 +242,7 @@ class _ResultRow extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          hoverColor: c.accent.withValues(alpha: 0.5),
+          hoverColor: c.accent.faded(0.5),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: switch (result.type) {

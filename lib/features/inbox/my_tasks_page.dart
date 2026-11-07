@@ -188,8 +188,8 @@ class _GroupHeader extends StatelessWidget {
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: c.muted.withValues(alpha: 0.4),
-        border: Border(bottom: BorderSide(color: c.border.withValues(alpha: 0.5))),
+        color: c.muted.faded(0.4),
+        border: Border(bottom: BorderSide(color: c.border.faded(0.5))),
       ),
       child: Row(
         children: [
@@ -253,10 +253,10 @@ class _TaskRow extends StatelessWidget {
       button: true,
       child: InkWell(
         onTap: () => openTask(context, task.id, projectId: task.projectId),
-        hoverColor: c.accent.withValues(alpha: 0.5),
+        hoverColor: c.accent.faded(0.5),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: c.border.withValues(alpha: 0.5))),
+            border: Border(bottom: BorderSide(color: c.border.faded(0.5))),
           ),
           child: LayoutBuilder(
             builder: (context, constraints) => constraints.maxWidth >= _singleLineMinWidth

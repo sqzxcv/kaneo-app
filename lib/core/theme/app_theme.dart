@@ -11,6 +11,14 @@ extension KaneoThemeContext on BuildContext {
   KaneoColors get colors => Theme.of(this).extension<KaneoColors>()!;
 }
 
+extension FadedColor on Color {
+  /// This color at [strength] of what it has, like the web app's `bg-muted/40`.
+  ///
+  /// Many tokens are translucent to begin with. `withValues(alpha: 0.4)` would replace that with 40%,
+  /// which is a strong wash of black or white rather than a fainter version of the token.
+  Color faded(double strength) => withValues(alpha: a * strength);
+}
+
 const _themeModeKey = 'kaneo.themeMode';
 
 /// Follows the system until the user picks a mode.
