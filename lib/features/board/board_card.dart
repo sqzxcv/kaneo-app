@@ -97,15 +97,7 @@ class BoardCard extends StatelessWidget {
                     if (task.assigneeId != null || task.assigneeName != null)
                       Tooltip(
                         message: task.assigneeName ?? context.t('mobile:board.assignee'),
-                        child: CircleAvatar(
-                          radius: 12,
-                          backgroundColor: colors.avatar,
-                          foregroundColor: colors.avatarForeground,
-                          child: Text(
-                            initials(task.assigneeName),
-                            style: const TextStyle(fontSize: 10),
-                          ),
-                        ),
+                        child: PersonAvatar(name: task.assigneeName, image: task.assigneeImage),
                       ),
                   ],
                 ),

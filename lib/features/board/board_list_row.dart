@@ -222,19 +222,14 @@ class BoardListRow extends StatelessWidget {
                     const SizedBox(width: 12),
                     Tooltip(
                       message: task.assigneeName ?? context.t('mobile:board.unassigned'),
-                      child: CircleAvatar(
-                        radius: 12,
-                        backgroundColor: task.assigneeId == null
-                            ? colors.avatarUnassigned
-                            : colors.avatar,
-                        foregroundColor: colors.avatarForeground,
-                        child: task.assigneeId == null && task.assigneeName == null
-                            ? const Icon(LucideIcons.user, size: 14)
-                            : Text(
-                                initials(task.assigneeName),
-                                style: const TextStyle(fontSize: 10),
-                              ),
-                      ),
+                      child: task.assigneeId == null && task.assigneeName == null
+                          ? CircleAvatar(
+                              radius: 12,
+                              backgroundColor: colors.avatarUnassigned,
+                              foregroundColor: colors.avatarForeground,
+                              child: const Icon(LucideIcons.user, size: 14),
+                            )
+                          : PersonAvatar(name: task.assigneeName, image: task.assigneeImage),
                     ),
                   ],
                 ),

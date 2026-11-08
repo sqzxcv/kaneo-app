@@ -187,4 +187,30 @@ void main() {
     expect(row(server.tasks.last['id'] as String), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+  testBothLayouts("the assignee's picture shows on the card and in the list, as on the web", (
+    tester,
+    size,
+  ) async {
+    final server = FakeKaneo();
+    server.members.first['image'] = '/api/user/avatar/a1';
+    await pumpKaneoApp(
+      tester,
+      server: server,
+      size: size,
+      location: AppRoutes.board(FakeKaneo.projectId),
+    );
+    Finder picture(Finder of) => find.descendant(
+      of: of,
+      matching: find.byWidgetPredicate(
+        (w) =>
+            w is Image &&
+            w.image is NetworkImage &&
+            (w.image as NetworkImage).url == '${FakeKaneo.serverUrl}/api/user/avatar/a1',
+      ),
+    );
+    expect(picture(find.byKey(const ValueKey('board-card-task-1'))), findsOneWidget);
+    await tester.tap(find.byTooltip('List view'));
+    await tester.pumpAndSettle();
+    expect(picture(row('task-1')), findsOneWidget);
+  });
 }
