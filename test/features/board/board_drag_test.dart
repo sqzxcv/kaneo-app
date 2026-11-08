@@ -235,6 +235,34 @@ void main() {
     expect(taskOpen('task-1'), findsNothing);
   });
 
+  onIOS('a finger picks the card up after a quarter second, as on the web', (tester, size) async {
+    final server = FakeKaneo();
+    await pumpBoard(tester, server, size);
+    final cards = find.byType(BoardCard).evaluate().length;
+    final gesture = await tester.startGesture(cardBody(tester, 'task-1'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(BoardCard), findsNWidgets(cards + 1), reason: 'The card was not picked up');
+    await goTo(tester, gesture, inProgress(tester));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(statusOf(server, 'task-1'), 'in-progress');
+  });
+
+  onIOS('picked up but let go in place before a long press, the card opens as a tap', (
+    tester,
+    size,
+  ) async {
+    final server = FakeKaneo();
+    final app = await pumpBoard(tester, server, size);
+    final gesture = await tester.startGesture(cardBody(tester, 'task-1'));
+    await tester.pump(const Duration(milliseconds: 350));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(taskOpen('task-1'), findsOneWidget);
+    expect(find.text(app.i18n.t('mobile:board.moveTo')), findsNothing);
+    expect(server.requestsTo('api/task/reorder'), isEmpty);
+  });
+
   onIOS('a long press let go of in place opens the menu and moves nothing', (tester, size) async {
     final server = FakeKaneo();
     final app = await pumpBoard(tester, server, size);

@@ -98,6 +98,11 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
   /// opens its menu instead, and the board does not scroll at its edges.
   bool _carried = false;
 
+  /// Whether the finger carrying the card has held it for a long press. Let go in place before
+  /// then, the card was only tapped, and it opens the task rather than the menu.
+  bool _pressedLong = false;
+  Timer? _longPress;
+
   /// Whether the pointer last to leave a card was lifted, rather than cancelled. It is set as the
   /// pointer leaves, just before the drag that pointer carried ends.
   bool _letGo = false;
@@ -110,11 +115,18 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
   OverlayEntry? _landingEntry;
 
   /// The pointers that drag a card once they have moved a little. A finger or pen scrolls the board
-  /// then, so it picks a card up with a long press instead.
+  /// then, so it picks a card up once held still a moment instead.
   static const _mice = {PointerDeviceKind.mouse, PointerDeviceKind.trackpad};
   static final _fingers = PointerDeviceKind.values.toSet().difference(_mice);
 
-  void _start(String id) {
+  /// How long a finger holds a card still to pick it up: the web board's touch delay.
+  static const _liftDelay = Duration(milliseconds: 250);
+
+  /// Starts carrying [id], held still for [held] before it was picked up, if a finger holds it.
+  void _start(String id, Duration? held) {
+    _longPress?.cancel();
+    _pressedLong = false;
+    if (held != null) _longPress = Timer(kLongPressTimeout - held, () => _pressedLong = true);
     widget.onDragging?.call(true);
     setState(() {
       _dragging = id;
@@ -163,6 +175,7 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
   @override
   void dispose() {
     _timer?.cancel();
+    _longPress?.cancel();
     _landingEntry?.remove();
     _horizontal.dispose();
     for (final controller in _vertical.values) {
@@ -307,7 +320,7 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
         return _grip;
       },
       feedback: LiftedCard(child: card),
-      onDragStarted: () => _start(task.id),
+      onDragStarted: () => _start(task.id, delay),
       onDragUpdate: (details) {
         _pointer = details.globalPosition;
         if ((details.globalPosition - _liftedAt).distance > kTouchSlop) _carried = true;
@@ -325,9 +338,10 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
     );
   }
 
-  /// Lets a mouse drag [card] once it has moved a little, and a finger or pen after a long press,
-  /// because moving at once they scroll the board. A long press let go of where it started opens
-  /// the card's menu, as it does on a card that can't move.
+  /// Lets a mouse drag [card] once it has moved a little, and a finger or pen once held still a
+  /// moment, as on the web board, because moving at once they scroll the board. Let go where it
+  /// started, a long press opens the card's menu, as it does on a card that can't move, and a
+  /// shorter one opens the task, as a tap would.
   Widget _liftable(HierarchyRow row, BoardColumn column, int? index, double width, Widget card) =>
       Listener(
         onPointerUp: (_) => _letGo = true,
@@ -345,9 +359,14 @@ class _BoardLanesState extends ConsumerState<BoardLanes> {
               index,
               width,
               devices: _fingers,
-              delay: kLongPressTimeout,
+              delay: _liftDelay,
               onEnd: (carried) {
-                if (_letGo && !carried) widget.onMenu?.call(anchor, row.task, _liftedAt);
+                if (!_letGo || carried) return;
+                if (_pressedLong) {
+                  widget.onMenu?.call(anchor, row.task, _liftedAt);
+                } else {
+                  openTask(anchor, row.task.id, projectId: row.task.projectId);
+                }
               },
               card,
             ),
